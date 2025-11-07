@@ -1,0 +1,24 @@
+1. 配置
+    cmake 源代码目录 -G "生成器名称" -DCMAKE_INSTALL_PREFIX="安装路径"
+    生成器名称："Visual Studio 17 2022" "MinGW Makefiles"
+    安装路径可以为相对路径，相对路径以源代码目录（CMakeLists.txt）所在目录为基准，也可以为绝对路径
+
+    MinGW为单配置生成器，VS为多配置生成器
+        MinGW：仅在配置时指定配置为Release或Debug
+            cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+            cmake --build . --parallel
+            cmake --install .
+        VS：必须在编译和安装时指定配置
+            cmake .. -G "Visual Studio 17 2022"
+            cmake --build . --config Release --parallel
+            cmake --install . --config Release
+
+    SDL2/
+        source/ --源代码目录，存放CMakeLists.txt
+        build/  --新建目录
+        install/--新建目录
+
+    在build目录下执行命令：
+        cmake ../source -DCMAKE_INSTALL_PREFIX="../install"
+        cmake --build . --config Release --parallel
+        cmake --install . --config Release

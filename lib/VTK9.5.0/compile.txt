@@ -1,0 +1,7 @@
+使用CMake GUI配置、编译并安装
+1. 打开GUI，设置源代码目录
+2. 点击左下角Configure，等待配置条目刷新
+3. 启用必要选项后点击Generate生成sln文件
+    设置的安装前缀（install prefix）必须使用正斜杠 / 分隔路径，否则会导致install失败
+4. 点击Open Project，在VS的解决方案管理器中右键ALL_BUILD，点击生成，等待编译完成
+5. 编译完成后，搜索或找到解决方案管理器中的INSTALL，右键生成
