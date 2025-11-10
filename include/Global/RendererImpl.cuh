@@ -72,14 +72,13 @@ namespace project {
     void cleanupAccelerationStructure(std::vector<IAS> & data);
 
     //构建实例列表，依次将传入的GAS句柄赋值给实例
-    //此函数返回实例指针，指针指向设备内存中的实例对象数组开头
-    OptixInstance * createInstances(const std::vector<GAS> & data);
-    void freeInstances(OptixInstance * & dev_instances);
+    //实例作为IAS的构建输入，和GAS构建输入一样需要在构建前临时拷贝至设备内存
+    std::vector<OptixInstance> createInstances(const std::vector<GAS> & data);
 
     //构建IAS
-    IAS buildIAS(OptixDeviceContext & context, const OptixInstance * dev_instances, size_t instanceCount);
+    IAS buildIAS(OptixDeviceContext & context, const std::vector<OptixInstance> & instances);
     //使用实例数组更新IAS。若需要重建，则释放原有IAS后重新调用buildIAS
-    void updateIAS(OptixDeviceContext & context, IAS & ias, const OptixInstance * dev_instances, size_t instanceCount);
+    void updateIAS(OptixDeviceContext & context, IAS & ias, const std::vector<OptixInstance> & instances);
 
     //创建模块，返回通过ptx创建的模块并获取内置球体求交模块和三角形求交模块
     std::array<OptixModule, 3> createModules(

@@ -3,14 +3,32 @@
 using namespace project;
 
 namespace {
-    void updateInstancesTransforms(OptixInstance * dev_instances, size_t instanceCount, size_t frameCount) {
+    void updateInstancesTransforms(std::vector<OptixInstance> & instances, unsigned long long frameCount) {
+        const static float3 initialCenter = {0.0, 2.0, 0.0};
+        const float radius = 2.0f;
+        const float speed = 0.02f;
+        const float angle = static_cast<float>(frameCount) * speed;
+        const float3 newCenter = {
+                initialCenter.x + radius * std::cos(angle) * 1.5f,
+                initialCenter.y + radius * std::sin(angle) * 1.5f,
+                initialCenter.z
+        };
+
+        //更新顺序需要对应实例在GAS数组中的顺序：第一个为球体，后续为粒子
+        float sphereTransform[12];
+        MathHelper::constructTransformMatrix(
+                {0.0f, 0.0f, -1010.0f},
+                {0.0f, 0.0f, 0.0f},
+                {1.0f, 1.0f, 1.0f}, sphereTransform);
+        memcpy(instances[0].transform, sphereTransform, 12 * sizeof(float));
+
         float transform[12];
         MathHelper::constructTransformMatrix(
-                {0.0, 0.0, 0.0},
-                {0.0, 0.0, 0.0},
-                {1.0, 1.0, 1.0}, transform);
-        for (size_t i = 0; i < instanceCount; i++) {
-            cudaCheckError(cudaMemcpy((dev_instances + i)->transform, transform, 12 * sizeof(float), cudaMemcpyHostToDevice));
+                newCenter,
+                newCenter * 10.0f,
+                {3.0f, 3.0f, 3.0f}, transform);
+        for (size_t i = 1; i < instances.size(); i++) {
+            memcpy(instances[i].transform, transform, 12 * sizeof(float));
         }
     }
 }
@@ -20,27 +38,34 @@ int main(int argc, char * argv[]) {
     //初始化optix
     auto context = createContext();
 
-    //读取VTK文件
+    // ====== 初始化几何体信息 ======
+    //球体
+    const std::vector<Sphere> spheres = {
+            {MaterialType::ROUGH, 3, float3{0.0f, 0.0f, 0.0f}, 1000.0f},
+    };
+    //粒子：读取VTK文件，并将文件中的所有粒子信息转换为粒子数组
     const auto vtkParticles = VTKReader::readVTKFile("../files/particle_mesh/particle_000000000040000.vtk");
-    const size_t particleCount = vtkParticles.size();
-
-    //将文件中的所有粒子信息转换为粒子数组
     const auto particles = VTKReader::convertToRendererData(vtkParticles);
 
-    //为每个粒子构建一个GAS并将指针存入数组：GAS句柄，GAS设备指针，当前粒子的SBT记录下标（当前设置为0，使用同一个记录）
-    std::vector<GAS> gasArray(particleCount);
+    // ====== 构建加速结构 ======
+    //构建顺序需要和SBT记录创建顺序相同（球体 -> 三角形 -> 粒子）
+    std::vector<GAS> gasArray;
+
+    //球体
+    gasArray.push_back(buildGASForSpheres(context, spheres));
+    //粒子，每个粒子一个GAS
     for (size_t i = 0; i < particles.size(); i++) {
-        auto [handle, ptr] = buildGASForTriangles(context, particles[i].triangles);
-        gasArray[i] = {handle, ptr}; //实例的sbtOffset属性决定此实例使用哪一个颜色
+        gasArray.push_back(buildGASForTriangles(context, particles[i].triangles));
     }
 
-    //构建实例列表
-    auto instancePtr = createInstances(gasArray);
-    //构建IAS
-    auto ias = buildIAS(context, instancePtr, particleCount);
-    auto & [iasHandle, _, _1] = ias;
+    //使用GAS信息构建实例列表
+    //实例的sbtOffset为实例在GAS中的下标
+    auto instances = createInstances(gasArray);
 
-    //创建模块和管线
+    //构建IAS
+    auto ias = buildIAS(context, instances);
+
+    // ====== 创建模块，管线和着色器绑定表 ======
     const OptixPipelineCompileOptions pipelineCompileOptions = {
             .usesMotionBlur = 0,
             .traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY,
@@ -56,23 +81,24 @@ int main(int argc, char * argv[]) {
 
     //几何体输入和材质输入
     const GeometryData geoData = {
-            .particles = particles
+            .spheres = spheres,
+            .particles = particles,
     };
     const MaterialData matData = {
             .roughs = {
                     {.65, .05, .05},
                     {.73, .73, .73},
                     {.12, .45, .15},
-                    {.70, .60, .50}
+                    {.70, .60, .50},
             },
             .metals = {
-                    {0.8, 0.85, 0.88, 0.0}
+                    {0.8, 0.85, 0.88, 0.0},
             }
     };
     //每个实例对应一条sbt记录
     auto sbt = createShaderBindingTable(programs, geoData, matData);
 
-    //设置窗口
+    // ====== 初始化窗口和全局资源 ======
     const auto type = SDL_GraphicsWindowAPIType::OPENGL;
     const int w = 1200, h = 800;
     auto camera = SDL_GraphicsWindowConfigureCamera(
@@ -89,21 +115,25 @@ int main(int argc, char * argv[]) {
 
     //设置全局参数
     const GlobalParams params = {
-            .handle = iasHandle,
+            .handle = std::get<0>(ias),
             .stateArray = dev_stateArray
     };
     CUdeviceptr dev_params = 0;
     cudaCheckError(cudaMalloc(reinterpret_cast<void **>(&dev_params), sizeof(GlobalParams)));
 
-    //启动渲染
+    // ====== 启动渲染 ======
     SDL_Log("Starting...");
     SDL_Event event;
     SDL_GraphicsWindowKeyMouseInput input;
-    size_t frameCount = 0;
+    unsigned long long frameCount = 0;
 
     while (!input.keyQuit) {
         SDL_GraphicsWindowFrameStart(args);
         SDL_GraphicsWindowUpdateCamera(event, input, args, camera);
+
+        //更新实例和IAS
+        updateInstancesTransforms(instances, frameCount);
+        updateIAS(context, ias, instances);
 
         //更新raygen
         const RayGenParams rgData = {
@@ -132,26 +162,23 @@ int main(int argc, char * argv[]) {
         SDL_GraphicsWindowPresentFrame(args);
         SDL_GraphicsWindowFrameFinish(args);
 
-        //更新实例
+        //更新帧计数
         frameCount++;
-        //updateInstancesTransforms(instancePtr, particleCount, frameCount);
-        //updateIAS(context, ias, instancePtr, particleCount); //需要更新全局参数的handle
     }
-    //清理窗口资源
+
+    // ====== 清理窗口资源和全局资源 ======
     SDL_Log("Finished.");
     SDL_DestroyGraphicsWindow(args);
     cudaCheckError(cudaFree(reinterpret_cast<void *>(dev_params)));
     RandomGenerator::freeDeviceRandomGenerators(dev_stateArray);
 
-    //清理资源
+    // ====== 清理资源 ======
     SDL_Log("Render finished, cleaning up resources...");
     freeShaderBindingTable(sbt);
     unlinkPipeline(pipeline);
     destroyProgramGroups(programs);
     destroyModules(modules);
-
     cleanupAccelerationStructure(ias);
-    freeInstances(instancePtr);
     cleanupAccelerationStructure(gasArray);
     destroyContext(context);
 

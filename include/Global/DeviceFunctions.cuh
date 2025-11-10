@@ -264,8 +264,12 @@ namespace project {
 
     //单位化
     __host__ __device__ __forceinline__ static float2 normalize(const float2 & obj) {
-        const float factor = 1.0f / sqrt(lengthSquared(obj));
-        return obj * factor;
+        const float len2 = lengthSquared(obj);
+        if (len2 <= FLOAT_ZERO_VALUE * FLOAT_ZERO_VALUE) {
+            return make_float2(1.0f, 0.0f); //安全缺省
+        }
+        const float invLen = rsqrtf(len2);
+        return obj * invLen;
     }
 
     // ========== float3 运算 ==========
@@ -365,8 +369,12 @@ namespace project {
 
     //单位化
     __host__ __device__ __forceinline__ static float3 normalize(const float3 & obj) {
-        const float factor = 1.0f / sqrt(lengthSquared(obj));
-        return obj * factor;
+        const float len2 = lengthSquared(obj);
+        if (len2 <= FLOAT_ZERO_VALUE * FLOAT_ZERO_VALUE) {
+            return make_float3(0.0f, 0.0f, 1.0f); //安全缺省
+        }
+        const float invLen = rsqrtf(len2);
+        return obj * invLen;
     }
 
     //点乘叉乘

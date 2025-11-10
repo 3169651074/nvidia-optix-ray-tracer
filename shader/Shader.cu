@@ -141,6 +141,20 @@ namespace project {
                 return;
         }
 
+        //确保反射方向可用，避免光线方向数值错误
+        if (!isfinite(reflectDirection.x) || !isfinite(reflectDirection.y) || !isfinite(reflectDirection.z) ||
+            lengthSquared(reflectDirection) <= FLOAT_ZERO_VALUE * FLOAT_ZERO_VALUE)
+        {
+            //尝试使用法线
+            reflectDirection = normalVector;
+            if (lengthSquared(reflectDirection) <= FLOAT_ZERO_VALUE * FLOAT_ZERO_VALUE ||
+                !isfinite(reflectDirection.x) || !isfinite(reflectDirection.y) || !isfinite(reflectDirection.z))
+            {
+                //使用固定值
+                reflectDirection = make_float3(0.0f, 0.0f, 1.0f);
+            }
+        }
+
         //递归追踪：以当前命中点为起点发射一条新的光线
         float4 result = {payload.x, payload.y, payload.z, payload.w + 1.0f};
         rayTrace(hitPoint, reflectDirection, FLOAT_ZERO_VALUE, FLOAT_INFINITY_VALUE, params.handle, result);
