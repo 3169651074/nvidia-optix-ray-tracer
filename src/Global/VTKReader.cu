@@ -1,9 +1,19 @@
 #include <Global/VTKReader.cuh>
-#include <JSON/json.hpp>
+using namespace project;
+
+//C++
 #include <fstream>
 #include <sstream>
+#include <thread>
+#include <atomic>
+#include <filesystem>
+namespace filesystem = std::filesystem; //using用于类型别名，不能用于命名空间别名
+
+//JSON
+#include <JSON/json.hpp>
 using json = nlohmann::json;
 
+//VTK
 #include <vtkSmartPointer.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataReader.h>
@@ -12,103 +22,91 @@ using json = nlohmann::json;
 #include <vtkFieldData.h>
 #include <vtkCell.h>
 #include <vtkCellTypes.h>
-#include <vtkVersion.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkPointData.h>
 
-namespace project {
-    std::tuple<std::vector<std::string>, std::vector<float>, size_t> VTKReader::readSeriesFile(const std::string & filePath) {
-        SDL_Log("Reading series file: %s", filePath.c_str());
-
-        //打开 JSON 文件
-        std::ifstream file(filePath);
-        if (!file.is_open()) {
-            SDL_Log("Could not open the series file!");
-            exit(-1);
-        }
-
-        json data;
-        try {
-            //使用 parse() 函数将文件流解析成一个 json 对象
-            data = json::parse(file);
-        } catch (json::parse_error & e) {
-            //如果文件内容不是有效的 JSON 格式，会抛出异常
-            SDL_Log("JSON parsing error: %s", e.what());
-            exit(-1);
-        }
-
-        //从 JSON 对象中提取数据
-        const std::string version = data["file-series-version"];
-        SDL_Log("Series file version: %s", version.c_str());
-
-        if (!(data.contains("files") && data["files"].is_array())) {
-            SDL_Log("Failed to parse files array in series file!");
-            exit(-1);
-        }
-
-        std::vector<std::string> files;
-        std::vector<float> times;
-
-        for (const auto & item : data["files"]) {
-            //从数组中的每个对象里提取 "name" 和 "time"
-            const std::string name = item["name"];
-            const float time = item["time"];
-            files.push_back(name);
-            times.push_back(time);
-        }
-
-        const size_t entryCount = files.size();
-        const size_t printEntryCount = std::min(entryCount, static_cast<size_t>(5));
-        SDL_Log("First %zd entries:", printEntryCount);
-        for (size_t i = 0; i < printEntryCount; i++) {
-            SDL_Log("Time: %f --> VTK file: %s", times[i], files[i].c_str());
-        }
-
-        SDL_Log("%s parse completed. Found %zd entries.", filePath.c_str(), entryCount);
-
-        //time的输入为每个文件出现的时间，转换为每个文件持续的时间：后一个文件的出现时间减去当前文件出现时间
-        std::vector<float> fileDurations(entryCount);
-        if (entryCount == 1) {
-            fileDurations[0] = 1000.0f;
+namespace {
+    //获取当前可执行文件的绝对路径
+    std::string currentExecutableDirectory() {
+        char buffer[300];
+        std::string execDir;
+#ifdef _WIN32
+        //Windows
+        if (GetModuleFileNameA(nullptr, buffer, sizeof(buffer))) {
+            execDir = std::string(buffer);
+            execDir = execDir.substr(0, execDir.find_last_of("\\/")); //去掉文件名，保留目录
         } else {
-            for (size_t i = 0; i < entryCount - 1; i++) {
-                fileDurations[i] = times[i + 1] - times[i];
-            }
-            //最后一个文件的出现时间使用倒数第二个文件的时间
-            fileDurations[entryCount - 1] = fileDurations[entryCount - 2];
+            SDL_Log("Error: Unable to get executable directory!");
+            exit(VTK_READER_ERROR_EXIT_CODE);
         }
-
-        return {files, fileDurations, entryCount};
+#else
+        //Linux
+        ssize_t count = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+        if (count != -1) {
+            buffer[count] = '\0'; //Null-terminate the string
+            execDir = std::string(dirname(buffer)); //获取目录部分
+        } else {
+            SDL_Log("Error: Unable to get executable directory!");
+            exit(VTK_READER_ERROR_EXIT_CODE);
+        }
+#endif
+        return execDir;
     }
 
-    std::vector<VTKParticle> VTKReader::readVTKFile(const std::string & filePath) {
-        //检查VTK文件头
+    //确保目录存在，可以传入绝对路径或当前工作目录（std::filesystem::current_path()）
+    void ensureDirectoryExists(const std::string & path) {
+        try {
+            //使用std::filesystem::create_directories递归创建目录
+            if (std::filesystem::create_directories(path)) {
+                SDL_Log("Create directory: %s.", path.c_str());
+            }
+        } catch (const std::filesystem::filesystem_error & e) {
+            SDL_Log("Exception in when creating path %s: %s!", path.c_str(), e.what());
+        }
+    }
+
+    //检查VTK文件头
+    void checkVTKFileHeader(const std::string & filePath) {
         std::ifstream file(filePath);
         if (!file.is_open()) {
             SDL_Log("Failed to open vtk file: %s!", filePath.c_str());
-            exit(-1);
+            exit(VTK_READER_ERROR_EXIT_CODE);
         }
         std::string line;
         getline(file, line);
         if (line.find("# vtk DataFile Version") == std::string::npos) {
             SDL_Log("Illegal vtk file header in file %s: %s!", filePath.c_str(), line.c_str());
-            exit(-1);
+            exit(VTK_READER_ERROR_EXIT_CODE);
         }
         file.close();
+    }
 
+    //使用VTK库读取VTK文件信息
+    typedef struct VTKParticle {
+        size_t id;
+        float3 velocity;
+        float2 boundingBoxRanges[3];
+        float3 centroid;
+        //组成此粒子的所有三角形顶点，保留triangle strip的格式
+        std::vector<float3> vertices;
+        //每个顶点对应的法向量，和顶点一一对应
+        std::vector<float3> verticesNormals;
+    } VTKParticle;
+
+    //读取单个VTK文件
+    std::vector<VTKParticle> readVTKFile(const std::string & filePath) {
         //读取VTK文件并获取vtkPolyData指针
         vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
         reader->SetFileName(filePath.c_str());
         reader->Update();
         vtkPolyData * polyData = reader->GetOutput();
         if (polyData == nullptr || polyData->GetNumberOfPoints() == 0) {
-            SDL_Log("Failed to get poly data pointer or there is no points in file %s!", filePath.c_str());
-            exit(-1);
+            SDL_Log("Failed to get poly data pointer or there is no points in file!");
+            exit(VTK_READER_ERROR_EXIT_CODE);
         }
-
         //全局点数量和粒子数量
         const vtkIdType numCells = polyData->GetNumberOfCells();
-        //SDL_Log("Total point count: %zd, cell count: %zd.", polyData->GetNumberOfPoints(), numCells);
+
         std::vector<VTKParticle> ret;
         ret.reserve(numCells);
 
@@ -117,8 +115,8 @@ namespace project {
         vtkDataArray * idArray = cellData ? cellData->GetArray("id") : nullptr;
         vtkDataArray * velArray = cellData ? cellData->GetArray("vel") : nullptr;
         if (cellData == nullptr || idArray == nullptr || velArray == nullptr) {
-            SDL_Log("Failed to read cell data, in file %s!", filePath.c_str());
-            exit(-1);
+            SDL_Log("Failed to read cell data, in file!");
+            exit(VTK_READER_ERROR_EXIT_CODE);
         }
 
         //计算全局顶点法向量
@@ -145,7 +143,7 @@ namespace project {
             //检查几何类型是否为vtkTriangleStrip
             if (strcmp(vtkCellTypes::GetClassNameFromTypeId(cell->GetCellType()), "vtkTriangleStrip") != 0) {
                 SDL_Log("Found illegal cell type: %s, aborting!", vtkCellTypes::GetClassNameFromTypeId(cell->GetCellType()));
-                exit(-1);
+                exit(VTK_READER_ERROR_EXIT_CODE);
             }
 
             //ID
@@ -219,260 +217,289 @@ namespace project {
             }
             ret.push_back(particle);
         }
-
-        //SDL_Log("VTK file %s read completed.", filePath.c_str());
         return ret;
     }
 
-    std::vector<Particle> VTKReader::convertToRendererData(const std::vector<VTKParticle> & particles) {
-        //一个粒子对应一个实例，对应一个二维数组元素
-        std::vector<Particle> rendererParticles(particles.size());
+    //读取一组VTK文件，获取单个文件Cell的最大数量
+    size_t maxCellCountSingleFile(const std::vector<std::string> & vtkFiles) {
+        SDL_Log("Finding out maximum cell count in a single VTK file...");
 
-        for (size_t i = 0; i < particles.size(); i++) {
-            const auto & particle = particles[i];
+        size_t maxCount = 0;
+        for (const auto & filePath: vtkFiles) {
+            //检查文件头
+            checkVTKFileHeader(filePath);
 
-            //vtkTriangleStrip由N个点组成N - 2个三角形
-            std::vector<Triangle> triangles;
-            const size_t triangleCount = particle.vertices.size() - 2;
-            triangles.reserve(triangles.size() + triangleCount);
-
-            //获取组成粒子的所有点，构造三角形数组
-            for (size_t j = 0; j < triangleCount; j++) {
-                std::array<float3, 3> vertices;
-                std::array<float3, 3> normals;
-
-                if ((j & 1) == 0) {
-                    //偶数三角形，顶点顺序保持不变
-                    vertices = {particle.vertices[j], particle.vertices[j + 1], particle.vertices[j + 2],};
-                    normals = {particle.verticesNormals[j], particle.verticesNormals[j + 1], particle.verticesNormals[j + 2],};
-                } else {
-                    //奇数三角形，第2，3个顶点需要取反以保持面法线方向一致
-                    vertices = {particle.vertices[j], particle.vertices[j + 2], particle.vertices[j + 1],};
-                    normals = {particle.verticesNormals[j], particle.verticesNormals[j + 2], particle.verticesNormals[j + 1],};
-                }
-
-                //将三角形存入数组。粒子的材质单独存储，无需为每个三角形赋值
-                const Triangle item = {
-                        .vertices = vertices,
-                        .normals = normals
-                };
-                triangles.push_back(item);
+            //获取vtkPolyData指针
+            vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
+            reader->SetFileName(filePath.c_str());
+            reader->Update();
+            vtkPolyData * polyData = reader->GetOutput();
+            if (polyData == nullptr) {
+                SDL_Log("Failed to get poly data pointer in file %s!", filePath.c_str());
+                exit(VTK_READER_ERROR_EXIT_CODE);
             }
 
-            //将当前粒子的所有三角形构建粒子结构体
-            rendererParticles[i].materialType = MaterialType::ROUGH;
-            rendererParticles[i].materialIndex = 1;
-            rendererParticles[i].triangles = triangles;
-            rendererParticles[i].velocity = particle.velocity;
+            //获取全局点数量
+            const vtkIdType numCells = polyData->GetNumberOfCells();
+            maxCount = std::max<size_t>(maxCount, numCells);
         }
-        return rendererParticles;
+
+        SDL_Log("Max cell count in a single VTK file: %zd.", maxCount);
+        return maxCount;
     }
 
-    void VTKReader::readSeriesFileToCache(const std::string & seriesFilePath, const std::string & seriesFileName, const std::string & cacheFilePath, bool isBinaryMode) {
-        SDL_Log("Generating VTK cache...");
+    //子线程函数：读取VTK文件，将其转换为渲染器粒子数组，并写入缓存文件
+    void writeVTKFileCache(size_t totalFileCount, size_t materialOffset, const std::string & vtkFilePathName,
+                           const std::string & cacheFilePathName, std::atomic<size_t> & processedFileCount)
+    {
+        //读取VTK粒子数组
+        const auto vtkParticles = readVTKFile(vtkFilePathName);
+        const auto particleCount = vtkParticles.size();
+
+        //打开文件
+        std::ofstream out(cacheFilePathName, std::ios::out | std::ios::binary);
+        if (!out.is_open()) {
+            SDL_Log("Failed to open file: %s!", cacheFilePathName.c_str());
+            exit(VTK_READER_ERROR_EXIT_CODE);
+        }
+        auto * buffer = new char [1024 * VTK_READER_IO_BUFFER_SIZE_KB];
+        out.rdbuf()->pubsetbuf(buffer, sizeof(buffer));
+
+        //写入粒子数量（元数据，用于读取相应数量的粒子）
+        out.write(reinterpret_cast<const char *>(&particleCount), sizeof(size_t));
+
+        //逐个转换每个粒子，转换完成后立即写入到文件
+        for (size_t i = 0; i < particleCount; i++) {
+            const auto & particle = vtkParticles[i];
+
+            //写入粒子基础信息
+            out.write(reinterpret_cast<const char *>(&particle.id), sizeof(size_t));                     //ID
+            out.write(reinterpret_cast<const char *>(&particle.velocity), sizeof(float3));               //速度
+            out.write(reinterpret_cast<const char *>(&particle.boundingBoxRanges), 3 * sizeof(float2));  //包围盒
+            out.write(reinterpret_cast<const char *>(&particle.centroid), sizeof(float3));               //重心
+            const size_t materialIndex = materialOffset + i;
+            out.write(reinterpret_cast<const char *>(&materialIndex), sizeof(size_t));                   //材质索引
+
+            //写入粒子几何数据：顶点数量，顶点数组和法线数组
+            const size_t triangleCount = particle.vertices.size() - 2; //vtkTriangleStrip由N个点组成N - 2个三角形
+            const size_t vertexCount = triangleCount * 3;
+            out.write(reinterpret_cast<const char *>(&vertexCount), sizeof(size_t));
+
+            //为了减少IO开销，将所有顶点和法线数据合并后一次性写入
+            std::vector<float3> particleVertices; particleVertices.reserve(vertexCount);
+            std::vector<float3> particleNormals;  particleNormals.reserve(vertexCount);
+
+            for (size_t j = 0; j < triangleCount; j++) {
+                particleVertices.push_back(particle.vertices[j]);
+                particleNormals.push_back(particle.verticesNormals[j]);
+
+                size_t idx1 = j + 1, idx2 = j + 2;
+                //偶数三角形，顶点顺序保持不变。奇数三角形，第2，3个顶点需要取反以保持面法线方向一致
+                if ((j & 1) != 0) {
+                    std::swap(idx1, idx2);
+                }
+                particleVertices.push_back(particle.vertices[idx1]);
+                particleVertices.push_back(particle.vertices[idx2]);
+                particleNormals.push_back(particle.verticesNormals[idx1]);
+                particleNormals.push_back(particle.verticesNormals[idx2]);
+            }
+
+            //写入三角形顶点和法线数据
+            out.write(reinterpret_cast<const char *>(particleVertices.data()), vertexCount * sizeof(float3));
+            out.write(reinterpret_cast<const char *>(particleNormals.data()), vertexCount * sizeof(float3));
+        }
+
+        out.close();
+        delete[] buffer;
+
+        //统计已处理文件个数：原子操作计数器
+        processedFileCount++;
+        SDL_Log("[%zd/%zd] (%.2f%%) Created cache for VTK file %s.",
+                processedFileCount.load(std::memory_order_relaxed), totalFileCount,
+                static_cast<float>(processedFileCount) / static_cast<float>(totalFileCount) * 100.0f, cacheFilePathName.c_str());
+    }
+}
+
+namespace project {
+    std::tuple<std::vector<std::string>, std::vector<float>, size_t> VTKReader::readSeriesFile(
+            const std::string & seriesFilePath, const std::string & seriesFileName)
+    {
+        const auto filePath = seriesFilePath + seriesFileName;
+        SDL_Log("Reading series file: %s...", filePath.c_str());
+
+        //打开JSON文件
+        std::ifstream file(filePath);
+        if (!file.is_open()) {
+            SDL_Log("Could not open the series file!");
+            exit(VTK_READER_ERROR_EXIT_CODE);
+        }
+
+        //读取数据到JSON对象
+        json data;
+        try {
+            //使用 parse() 函数将文件流解析成一个 json 对象
+            data = json::parse(file);
+        } catch (json::parse_error & e) {
+            SDL_Log("JSON parsing error: %s", e.what());
+            exit(VTK_READER_ERROR_EXIT_CODE);
+        }
+
+        //从JSON对象中提取数据
+        const std::string version = data["file-series-version"];
+        SDL_Log("Series file version: %s", version.c_str());
+        if (!(data.contains("files") && data["files"].is_array())) {
+            SDL_Log("Failed to parse files array in series file!");
+            exit(VTK_READER_ERROR_EXIT_CODE);
+        }
+
+        std::vector<std::string> files;
+        std::vector<float> times;
+        for (const auto & item : data["files"]) {
+            const std::string name = item["name"]; files.push_back(seriesFilePath + name); //合并series文件路径
+            const float time = item["time"]; times.push_back(time);
+        }
+
+        //打印前5条记录
+        const size_t entryCount = files.size();
+        const size_t printEntryCount = std::min<size_t>(entryCount, 5);
+        SDL_Log("First %zd entries:", printEntryCount);
+        for (size_t i = 0; i < printEntryCount; i++) {
+            SDL_Log("Time: %f --> VTK file: %s", times[i], files[i].c_str());
+        }
+
+        //转换时间信息
+        //time的输入为每个文件出现的时间，转换为每个文件持续的时间：后一个文件的出现时间减去当前文件出现时间
+        std::vector<float> fileDurations(entryCount);
+        if (entryCount == 1) {
+            fileDurations[0] = 1000.0f;
+        } else {
+            for (size_t i = 0; i < entryCount - 1; i++) {
+                fileDurations[i] = times[i + 1] - times[i];
+            }
+            //最后一个文件的出现时间使用倒数第二个文件的时间
+            fileDurations[entryCount - 1] = fileDurations[entryCount - 2];
+        }
+        file.close();
+
+        SDL_Log("Series file parse completed, found %zd entries.", entryCount);
+        return {files, fileDurations, entryCount};
+    }
+
+    void VTKReader::writeVTKDataCache(
+            const std::string & seriesFilePath, const std::string & seriesFileName,
+            const std::string & cacheFilePath, size_t materialOffset)
+    {
+        SDL_Log("Generating VTK data cache...");
 
         //读取series文件
-        const auto [files, times, fileCount] = readSeriesFile(seriesFilePath + seriesFileName);
+        const auto [vtkFiles, durations, fileCount] = readSeriesFile(seriesFilePath, seriesFileName);
 
-        //创建缓存文件
-        std::ofstream out;
-        if (isBinaryMode) {
-            out.open(cacheFilePath, std::ios::out | std::ios::binary);
-        } else {
-            out.open(cacheFilePath, std::ios::out);
+        //确保缓存文件目录存在
+        filesystem::path path(cacheFilePath);
+filesystem::create_directories(path);
+
+        //由于获取所有文件最大Cell数量耗时较长，则将其写入独立文件，用于快速构造材质数组，同时使得材质构造较为灵活
+        const auto maxCellCount = maxCellCountSingleFile(vtkFiles);
+        SDL_Log("Max cell count in a single VTK file: %zd.", maxCellCount);
+        std::ofstream metaData(cacheFilePath + "metadata.cache", std::ios::out);
+        if (!metaData.is_open()) {
+            SDL_Log("Failed to open file: %s!", (cacheFilePath + "metadata.cache").c_str());
+            exit(VTK_READER_ERROR_EXIT_CODE);
         }
+        metaData << maxCellCount;
+        metaData.close();
 
-        if (!out) {
-            SDL_Log("Error: Could not create or open cache file: %s!", cacheFilePath.c_str());
-            exit(-1);
-        }
-
-        //读取所有VTK文件，并将返回值写入缓存文件
+        //启动多个线程处理数据，每个文件一个线程
+        SDL_Log("Starting processing VTK files...");
+        std::atomic<size_t> processedFileCount(0);
+        std::vector<std::thread> threads;
         for (size_t i = 0; i < fileCount; i++) {
-            SDL_Log("[%zd/%zd] (%zd%%) Reading VTK file: %s...", i, fileCount,
-                    static_cast<size_t>(static_cast<float>(i) / fileCount * 100.0f), files[i].c_str());
-            const auto particles = readVTKFile(seriesFilePath + files[i]);
-
-            if (isBinaryMode) {
-                //二进制模式：直接写入原始数据
-                size_t particleCount = particles.size();
-                out.write(reinterpret_cast<const char*>(&particleCount), sizeof(size_t));
-
-                for (const auto & particle: particles) {
-                    //写入基础信息
-                    out.write(reinterpret_cast<const char*>(&i), sizeof(size_t));
-                    out.write(reinterpret_cast<const char*>(&particle.id), sizeof(particle.id));
-                    out.write(reinterpret_cast<const char*>(&particle.velocity), sizeof(particle.velocity));
-                    out.write(reinterpret_cast<const char*>(&particle.boundingBoxRanges), sizeof(particle.boundingBoxRanges));
-                    out.write(reinterpret_cast<const char*>(&particle.centroid), sizeof(particle.centroid));
-
-                    //写入顶点坐标
-                    size_t vertexCount = particle.vertices.size();
-                    out.write(reinterpret_cast<const char*>(&vertexCount), sizeof(size_t));
-                    out.write(reinterpret_cast<const char*>(particle.vertices.data()), vertexCount * sizeof(float3));
-
-                    //写入顶点法线
-                    size_t normalCount = particle.verticesNormals.size();
-                    out.write(reinterpret_cast<const char*>(&normalCount), sizeof(size_t));
-                    out.write(reinterpret_cast<const char*>(particle.verticesNormals.data()), normalCount * sizeof(float3));
-                }
-            } else {
-                //文本模式：转换为字符串后写入
-                for (const auto & particle: particles) {
-                    //第一行：基础信息
-                    out << "[" << i << "]; "
-                        << "ID = " << particle.id << "; "
-                        << "Velocity = (" << particle.velocity.x << ", " << particle.velocity.y << ", " << particle.velocity.z << "); "
-                        << "BoundingBox = [0](" << particle.boundingBoxRanges[0].x << ", " << particle.boundingBoxRanges[0].y << "), "
-                        << "[1](" << particle.boundingBoxRanges[1].x << ", " << particle.boundingBoxRanges[1].y << "), "
-                        << "[2](" << particle.boundingBoxRanges[2].x << ", " << particle.boundingBoxRanges[2].y << "); "
-                        << "Centroid = (" << particle.centroid.x << ", " << particle.centroid.y << ", " << particle.centroid.z << ")\n";
-
-                    //第二行：顶点坐标，保留原格式
-                    for (const auto & vertex: particle.vertices) {
-                        out << vertex.x << ", " << vertex.y << ", " << vertex.z << ", ";
-                    }
-                    out << "\n";
-
-                    //第三行：顶点法线，保留原格式
-                    for (const auto & normal: particle.verticesNormals) {
-                        out << normal.x << ", " << normal.y << ", " << normal.z << ", ";
-                    }
-                    out << "\n";
-                }
-            }
+            threads.emplace_back(
+                    writeVTKFileCache, fileCount, materialOffset,
+                    vtkFiles[i], cacheFilePath + "particle" + std::to_string(i) + ".cache",
+                    std::ref(processedFileCount));
         }
-        out.close();
 
-        SDL_Log("Cache generated, quit.");
+        //等待所有线程结束
+        for (auto & t : threads) {
+            t.join();
+        }
+
+        SDL_Log("VTK data cache files are written to cache directory: %s.", cacheFilePath.c_str());
         exit(0);
     }
 
-    std::vector<std::vector<VTKParticle>> VTKReader::readVTKFromCache(const std::string & cacheFilePath, bool isBinaryMode) {
-        SDL_Log("Reading VTK cache...");
-
+    std::vector<Particle> VTKReader::readVTKDataCache(const std::string & cacheFilePathName) {
         //打开缓存文件
-        std::ifstream in;
-        if (isBinaryMode) {
-            in.open(cacheFilePath, std::ios::in | std::ios::binary);
-        } else {
-            in.open(cacheFilePath, std::ios::in);
+        std::ifstream in(cacheFilePathName, std::ios::in | std::ios::binary);
+        if (!in.is_open()) {
+            SDL_Log("Failed to open cache file: %s!", cacheFilePathName.c_str());
+            exit(VTK_READER_ERROR_EXIT_CODE);
         }
+        auto * buffer = new char [1024 * VTK_READER_IO_BUFFER_SIZE_KB];
+        in.rdbuf()->pubsetbuf(buffer, sizeof(buffer));
 
-        if (!in) {
-            SDL_Log("Error: Could not open cache file: %s!", cacheFilePath.c_str());
-            exit(-1);
-        }
+        //读取粒子数量
+        size_t particleCount;
+        in.read(reinterpret_cast<char *>(&particleCount), sizeof(size_t));
 
-        //用于存储所有帧的粒子数据
-        std::vector<std::vector<VTKParticle>> allFrames;
+        std::vector<Particle> particleForThisFile(particleCount);
 
-        if (isBinaryMode) {
-            //二进制模式：直接读取原始数据
-            while (in.peek() != EOF) {
-                size_t particleCount;
-                in.read(reinterpret_cast<char*>(&particleCount), sizeof(size_t));
-                if (in.eof()) break;
+        //逐个读取每个粒子
+        for (size_t i = 0; i < particleCount; i++) {
+            //ID（未使用）速度 包围盒（未使用）重心（未使用）材质索引 顶点数量 顶点数组 法线数组
+            size_t id;
+            in.read(reinterpret_cast<char *>(&id), sizeof(size_t));
+            float3 velocity;
+            in.read(reinterpret_cast<char *>(&velocity), sizeof(float3));
+            float2 boundingBox[3];
+            in.read(reinterpret_cast<char *>(&boundingBox), 3 * sizeof(float2));
+            float3 centroid;
+            in.read(reinterpret_cast<char *>(&centroid), sizeof(float3));
+            size_t materialIndex;
+            in.read(reinterpret_cast<char *>(&materialIndex), sizeof(size_t));
 
-                for (size_t p = 0; p < particleCount; p++) {
-                    VTKParticle particle;
-                    size_t frameIndex;
+            size_t vertexCount;
+            in.read(reinterpret_cast<char *>(&vertexCount), sizeof(size_t));
 
-                    //读取基础信息
-                    in.read(reinterpret_cast<char*>(&frameIndex), sizeof(size_t));
-                    in.read(reinterpret_cast<char*>(&particle.id), sizeof(particle.id));
-                    in.read(reinterpret_cast<char*>(&particle.velocity), sizeof(particle.velocity));
-                    in.read(reinterpret_cast<char*>(&particle.boundingBoxRanges), sizeof(particle.boundingBoxRanges));
-                    in.read(reinterpret_cast<char*>(&particle.centroid), sizeof(particle.centroid));
+            std::vector<float3> vertexes(vertexCount), normals(vertexCount);
+            in.read(reinterpret_cast<char *>(vertexes.data()), vertexCount * sizeof(float3));
+            in.read(reinterpret_cast<char *>(normals.data()), vertexCount * sizeof(float3));
 
-                    //读取顶点坐标
-                    size_t vertexCount;
-                    in.read(reinterpret_cast<char*>(&vertexCount), sizeof(size_t));
-                    particle.vertices.resize(vertexCount);
-                    in.read(reinterpret_cast<char*>(particle.vertices.data()), vertexCount * sizeof(float3));
-
-                    //读取顶点法线
-                    size_t normalCount;
-                    in.read(reinterpret_cast<char*>(&normalCount), sizeof(size_t));
-                    particle.verticesNormals.resize(normalCount);
-                    in.read(reinterpret_cast<char*>(particle.verticesNormals.data()), normalCount * sizeof(float3));
-
-                    //确保allFrames有足够的空间存储当前帧
-                    if (frameIndex >= allFrames.size()) {
-                        allFrames.resize(frameIndex + 1);
-                    }
-
-                    //将粒子添加到对应帧
-                    allFrames[frameIndex].push_back(particle);
-                }
+            //还原顶点数组和法线数组为三角形数组
+            const size_t triangleCount = vertexCount / 3;
+            std::vector<Triangle> triangles(triangleCount);
+            for (size_t j = 0; j < triangleCount; j++) {
+                triangles[j].vertices = std::array<float3, 3>{vertexes[j * 3 + 0], vertexes[j * 3 + 1], vertexes[j * 3 + 2]};
+                triangles[j].normals = std::array<float3, 3>{normals[j * 3 + 0], normals[j * 3 + 1], normals[j * 3 + 2]};
             }
-        } else {
-            //文本模式：解析字符串
-            std::string line;
-            while (std::getline(in, line)) {
-                //第一行：基础信息
-                VTKParticle particle;
-                size_t frameIndex;
 
-                //解析基础信息
-                std::istringstream iss(line);
-                char discard;
-                iss >> discard >> frameIndex >> discard >> discard; //读取 "[frameIndex]; "
-
-                std::string temp;
-                iss >> temp >> discard >> particle.id >> discard; //读取 "ID = particle.id; "
-
-                iss >> temp >> discard >> discard; //读取 "Velocity = ("
-                iss >> particle.velocity.x >> discard >> particle.velocity.y >> discard >> particle.velocity.z >> discard >> discard; // 读取速度
-
-                iss >> temp >> discard >> discard >> discard; //读取 "BoundingBox = [0]("
-                iss >> particle.boundingBoxRanges[0].x >> discard >> particle.boundingBoxRanges[0].y >> discard >> discard; // 读取 boundingBox[0]
-                iss >> discard >> discard >> discard; //读取 "[1]("
-                iss >> particle.boundingBoxRanges[1].x >> discard >> particle.boundingBoxRanges[1].y >> discard >> discard; // 读取 boundingBox[1]
-                iss >> discard >> discard >> discard; //读取 "[2]("
-                iss >> particle.boundingBoxRanges[2].x >> discard >> particle.boundingBoxRanges[2].y >> discard >> discard; // 读取 boundingBox[2]
-
-                iss >> temp >> discard >> discard; //读取 "Centroid = ("
-                iss >> particle.centroid.x >> discard >> particle.centroid.y >> discard >> particle.centroid.z >> discard; // 读取质心
-
-                //第二行：顶点坐标
-                if (!std::getline(in, line)) {
-                    SDL_Log("Error: Unexpected end of file while reading vertices!");
-                    exit(-1);
-                }
-                std::istringstream vertexStream(line);
-                while (vertexStream.good()) {
-                    float3 vertex;
-                    vertexStream >> vertex.x >> discard >> vertex.y >> discard >> vertex.z >> discard;
-                    if (vertexStream.fail()) break;
-                    particle.vertices.push_back(vertex);
-                }
-
-                //第三行：顶点法线
-                if (!std::getline(in, line)) {
-                    SDL_Log("Error: Unexpected end of file while reading normals!");
-                    exit(-1);
-                }
-                std::istringstream normalStream(line);
-                while (normalStream.good()) {
-                    float3 normal;
-                    normalStream >> normal.x >> discard >> normal.y >> discard >> normal.z >> discard;
-                    if (normalStream.fail()) break;
-                    particle.verticesNormals.push_back(normal);
-                }
-
-                //确保allFrames有足够的空间存储当前帧
-                if (frameIndex >= allFrames.size()) {
-                    allFrames.resize(frameIndex + 1);
-                }
-
-                //将粒子添加到对应帧
-                allFrames[frameIndex].push_back(particle);
-            }
+            //添加到文件缓存数据
+            const Particle particle = {
+                    .materialType = MaterialType::ROUGH,
+                    .materialIndex = materialIndex,
+                    .triangles = triangles,
+                    .velocity = velocity
+            };
+            particleForThisFile[i] = particle;
         }
         in.close();
+        delete[] buffer;
 
-        SDL_Log("Cache read successfully, total frames: %zd", allFrames.size());
-        return allFrames;
+        return particleForThisFile;
+    }
+
+    size_t VTKReader::maxCellCountSingleVTKFile(const std::string & cacheFilePath) {
+        std::ifstream metaData(cacheFilePath + "metadata.cache", std::ios::in);
+        if (!metaData.is_open()) {
+            SDL_Log("Failed to open file: %s!", (cacheFilePath + "metadata.cache").c_str());
+            exit(VTK_READER_ERROR_EXIT_CODE);
+        }
+        size_t maxCount;
+        metaData >> maxCount;
+        metaData.close();
+
+        SDL_Log("Max cell count in a single VTK file: %zd.", maxCount);
+        return maxCount;
     }
 }

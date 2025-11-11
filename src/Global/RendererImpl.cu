@@ -10,7 +10,7 @@ namespace project {
     typedef SbtRecord<MissParams>     MissSbtRecord;
     typedef SbtRecord<HitGroupParams> HitGroupSbtRecord;
 
-    OptixDeviceContext createContext(bool isDebug) {
+    OptixDeviceContext createContext(const char * cacheFilePath, bool isDebug) {
         SDL_Log("Creating context...");
         cudaCheckError(cudaFree(nullptr));
         optixCheckError(optixInit());
@@ -23,7 +23,7 @@ namespace project {
         OptixDeviceContext optixDeviceContext = nullptr;
         CUcontext cudaContext = nullptr;
         optixCheckError(optixDeviceContextCreate(cudaContext, &options, &optixDeviceContext));
-        optixCheckError(optixDeviceContextSetCacheLocation(optixDeviceContext, "../cache"));
+        optixCheckError(optixDeviceContextSetCacheLocation(optixDeviceContext, cacheFilePath));
         SDL_Log("Context created.");
         return optixDeviceContext;
     }
@@ -33,7 +33,7 @@ namespace project {
         context = nullptr;
     }
 
-    GAS buildGASForSpheres(OptixDeviceContext & context, const std::vector<Sphere> & spheres) {
+    GAS buildGASForSpheres(OptixDeviceContext & context, const std::vector<Sphere> & spheres, cudaStream_t stream) {
         //SDL_Log("Building GAS for spheres...");
 
         //GAS为静态，无需更新，则设置为可压缩且高质量
@@ -91,12 +91,12 @@ namespace project {
         //构建GAS
         OptixTraversableHandle handle = 0;
         optixCheckError(optixAccelBuild(
-                context, nullptr, &buildOptions,
+                context, stream, &buildOptions,
                 &buildInput, 1,
                 dev_tempBuffer, bufferSizes.tempSizeInBytes,
                 dev_output, bufferSizes.outputSizeInBytes,
                 &handle, &emitProperty, 1));
-        cudaCheckError(cudaDeviceSynchronize());
+        cudaCheckError(cudaStreamSynchronize(stream));
 
         //释放临时空间
         cudaCheckError(cudaFree(reinterpret_cast<void *>(dev_tempBuffer)));
@@ -113,10 +113,10 @@ namespace project {
             CUdeviceptr dev_compressedGasOutput = 0;
             cudaCheckError(cudaMalloc(reinterpret_cast<void **>(&dev_compressedGasOutput), compressedSize));
             optixCheckError(optixAccelCompact(
-                    context, nullptr, handle,
+                    context, stream, handle,
                     dev_compressedGasOutput, compressedSize,
                     &handle));
-            cudaCheckError(cudaDeviceSynchronize());
+            cudaCheckError(cudaStreamSynchronize(stream));
 
             //释放原有空间
             cudaCheckError(cudaFree(reinterpret_cast<void *>(dev_output)));
@@ -128,7 +128,7 @@ namespace project {
         //SDL_Log("GAS for spheres built.");
         return {handle, dev_output};
     }
-    GAS buildGASForTriangles(OptixDeviceContext & context, const std::vector<Triangle> & triangles) {
+    GAS buildGASForTriangles(OptixDeviceContext & context, const std::vector<Triangle> & triangles, cudaStream_t stream) {
         //SDL_Log("Building GAS for triangles...");
 
         const OptixAccelBuildOptions buildOptions = {
@@ -182,12 +182,12 @@ namespace project {
         //构建GAS
         OptixTraversableHandle handle = 0;
         optixCheckError(optixAccelBuild(
-                context, nullptr, &buildOptions,
+                context, stream, &buildOptions,
                 &buildInput, 1,
                 dev_tempBuffer, bufferSizes.tempSizeInBytes,
                 dev_output, bufferSizes.outputSizeInBytes,
                 &handle, &emitProperty, 1));
-        cudaCheckError(cudaDeviceSynchronize());
+        cudaCheckError(cudaStreamSynchronize(stream));
 
         //释放临时空间
         cudaCheckError(cudaFree(reinterpret_cast<void *>(dev_tempBuffer)));
@@ -203,10 +203,10 @@ namespace project {
             CUdeviceptr dev_compressedGasOutput = 0;
             cudaCheckError(cudaMalloc(reinterpret_cast<void **>(&dev_compressedGasOutput), compressedSize));
             optixCheckError(optixAccelCompact(
-                    context, nullptr, handle,
+                    context, stream, handle,
                     dev_compressedGasOutput, compressedSize,
                     &handle));
-            cudaCheckError(cudaDeviceSynchronize());
+            cudaCheckError(cudaStreamSynchronize(stream));
 
             //释放原有空间
             cudaCheckError(cudaFree(reinterpret_cast<void *>(dev_output)));
@@ -262,7 +262,7 @@ namespace project {
         return instances;
     }
 
-    IAS buildIAS(OptixDeviceContext & context, const std::vector<OptixInstance> & instances) {
+    IAS buildIAS(OptixDeviceContext & context, const std::vector<OptixInstance> & instances, cudaStream_t stream) {
         const size_t instanceCount = instances.size();
 
         //同GAS，实例数组作为构建输入，需要被拷贝至设备内存
@@ -293,9 +293,9 @@ namespace project {
 
         //构建IAS，不压缩，支持压缩的加速结构不支持更新
         OptixTraversableHandle handle = 0;
-        optixCheckError(optixAccelBuild(context, nullptr, &buildOptions, &buildInput, 1, dev_tempBuffer, bufferSizes.tempSizeInBytes,
+        optixCheckError(optixAccelBuild(context, stream, &buildOptions, &buildInput, 1, dev_tempBuffer, bufferSizes.tempSizeInBytes,
                                         dev_output, bufferSizes.outputSizeInBytes, &handle, nullptr, 0));
-        cudaCheckError(cudaDeviceSynchronize());
+        cudaCheckError(cudaStreamSynchronize(stream));
 
         //释放临时空间
         cudaCheckError(cudaFree(reinterpret_cast<void *>(dev_tempBuffer)));
@@ -303,7 +303,7 @@ namespace project {
 
         return {handle, dev_output, bufferSizes};
     }
-    void updateIAS(OptixDeviceContext & context, IAS & ias, const std::vector<OptixInstance> & instances) {
+    void updateIAS(OptixDeviceContext & context, IAS & ias, const std::vector<OptixInstance> & instances, cudaStream_t stream) {
         const size_t instanceCount = instances.size();
         CUdeviceptr dev_instances = 0;
         cudaCheckError(cudaMalloc(reinterpret_cast<void **>(&dev_instances), instanceCount * sizeof(OptixInstance)));
@@ -328,12 +328,12 @@ namespace project {
 
         //更新
         optixCheckError(optixAccelBuild(
-                context, nullptr, &buildOptions,
+                context, stream, &buildOptions,
                 &buildInput, 1,
                 dev_tempBuffer, bufferSizes.tempUpdateSizeInBytes, //改为tempUpdateSize
                 ptr, bufferSizes.outputSizeInBytes,
                 &handle, nullptr, 0));
-        cudaCheckError(cudaDeviceSynchronize());
+        cudaCheckError(cudaStreamSynchronize(stream));
 
         cudaCheckError(cudaFree(reinterpret_cast<void *>(dev_tempBuffer)));
         cudaCheckError(cudaFree(reinterpret_cast<void *>(dev_instances)));

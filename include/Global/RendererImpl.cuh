@@ -61,12 +61,12 @@ namespace project {
     typedef std::tuple<OptixTraversableHandle, CUdeviceptr, OptixAccelBufferSizes> IAS;
 
     //初始化optix上下文
-    OptixDeviceContext createContext(bool isDebugMode = true);
+    OptixDeviceContext createContext(const char * cacheFilePath, bool isDebugMode = true);
     void destroyContext(OptixDeviceContext & context);
 
     //构建GAS
-    GAS buildGASForSpheres(OptixDeviceContext & context, const std::vector<Sphere> & spheres);
-    GAS buildGASForTriangles(OptixDeviceContext & context, const std::vector<Triangle> & triangles);
+    GAS buildGASForSpheres(OptixDeviceContext & context, const std::vector<Sphere> & spheres, cudaStream_t stream = nullptr);
+    GAS buildGASForTriangles(OptixDeviceContext & context, const std::vector<Triangle> & triangles, cudaStream_t stream = nullptr);
 
     //释放加速结构内存
     void cleanupAccelerationStructure(GAS & data);
@@ -79,9 +79,9 @@ namespace project {
     std::vector<OptixInstance> createInstances(const std::vector<GAS> & data);
 
     //构建IAS
-    IAS buildIAS(OptixDeviceContext & context, const std::vector<OptixInstance> & instances);
+    IAS buildIAS(OptixDeviceContext & context, const std::vector<OptixInstance> & instances, cudaStream_t stream = nullptr);
     //使用实例数组更新IAS。若需要重建，则释放原有IAS后重新调用buildIAS
-    void updateIAS(OptixDeviceContext & context, IAS & ias, const std::vector<OptixInstance> & instances);
+    void updateIAS(OptixDeviceContext & context, IAS & ias, const std::vector<OptixInstance> & instances, cudaStream_t stream = nullptr);
 
     //创建模块，返回通过ptx创建的模块并获取内置球体求交模块和三角形求交模块
     std::array<OptixModule, 3> createModules(
