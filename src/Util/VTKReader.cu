@@ -287,19 +287,41 @@ namespace project {
         //启动多个线程处理数据，每个文件一个线程
         SDL_Log("Starting processing VTK files...");
         std::atomic<size_t> processedFileCount(0), maxCellCountSingleFile(0);
-        std::vector<std::thread> threads;
 
+#ifdef ALL_LAUNCH
+        //启动全部线程
+        std::vector<std::thread> threads;
         for (size_t i = 0; i < fileCount; i++) {
             threads.emplace_back(
                     writeVTKFileCache, fileCount,
                     vtkFiles[i], cacheFilePath + "particle" + std::to_string(i) + ".cache",
                     std::ref(processedFileCount), std::ref(maxCellCountSingleFile));
         }
-
         //等待所有线程结束
         for (auto & t : threads) {
             t.join();
         }
+#else
+        //启动线程数不超过设定的最大值
+        const size_t hwThreads = std::thread::hardware_concurrency();
+        const size_t maxWorkers = (MAX_CACHE_LOAD_THREAD_COUNT == 0) ? hwThreads : MAX_CACHE_LOAD_THREAD_COUNT;
+
+        std::deque<std::thread> workers;
+        for (size_t i = 0; i < fileCount; i++) {
+            workers.emplace_back(
+                    writeVTKFileCache, fileCount,
+                    vtkFiles[i], cacheFilePath + "particle" + std::to_string(i) + ".cache",
+                    std::ref(processedFileCount), std::ref(maxCellCountSingleFile));
+            if (workers.size() == maxWorkers) {
+                workers.front().join();
+                workers.pop_front();
+            }
+        }
+        while (!workers.empty()) {
+            workers.front().join();
+            workers.pop_front();
+        }
+#endif
 
         //将所有文件最大Cell数量耗时较长写入独立文件用于快速构造材质数组，同时使得材质构造较为灵活
         const auto maxCellCount = maxCellCountSingleFile.load(std::memory_order_relaxed);
