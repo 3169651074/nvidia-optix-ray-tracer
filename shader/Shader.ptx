@@ -634,10 +634,10 @@ $L__BB2_2:
 	// begin inline asm
 	call (%r41), _optix_read_primitive_idx, ();
 	// end inline asm
-	ld.u64 	%rd4, [%rd3+8];
+	ld.u64 	%rd4, [%rd3];
 	mul.wide.u32 	%rd5, %r41, 12;
 	add.s64 	%rd6, %rd4, %rd5;
-	ld.u64 	%rd7, [%rd3+16];
+	ld.u64 	%rd7, [%rd3+8];
 	mul.wide.u32 	%rd8, %r41, 4;
 	add.s64 	%rd9, %rd7, %rd8;
 	ld.f32 	%f46, [%rd6];
@@ -746,8 +746,8 @@ $L__BB2_8:
 	selp.f32 	%f115, %f68, %f109, %p5;
 	selp.f32 	%f116, %f69, %f110, %p5;
 	selp.f32 	%f117, %f70, %f111, %p5;
-	ld.v2.f32 	{%f76, %f77}, [%rd3+24];
-	ld.f32 	%f35, [%rd3+32];
+	ld.v2.f32 	{%f76, %f77}, [%rd3+16];
+	ld.f32 	%f35, [%rd3+24];
 	abs.f32 	%f78, %f115;
 	setp.geu.f32 	%p6, %f78, 0f7F800000;
 	@%p6 bra 	$L__BB2_12;
@@ -920,10 +920,10 @@ $L__BB3_2:
 	// begin inline asm
 	call (%r41), _optix_read_primitive_idx, ();
 	// end inline asm
-	ld.u64 	%rd4, [%rd3+8];
+	ld.u64 	%rd4, [%rd3];
 	mul.wide.u32 	%rd5, %r41, 12;
 	add.s64 	%rd6, %rd4, %rd5;
-	ld.u64 	%rd7, [%rd3+16];
+	ld.u64 	%rd7, [%rd3+8];
 	mul.wide.u32 	%rd8, %r41, 4;
 	add.s64 	%rd9, %rd7, %rd8;
 	ld.f32 	%f66, [%rd6];
@@ -972,7 +972,7 @@ $L__BB3_4:
 	mul.f32 	%f143, %f23, %f88;
 
 $L__BB3_6:
-	ld.f32 	%f36, [%rd3+36];
+	ld.f32 	%f36, [%rd3+28];
 	setp.leu.f32 	%p4, %f36, 0f00000000;
 	@%p4 bra 	$L__BB3_12;
 
@@ -1054,8 +1054,8 @@ $L__BB3_11:
 	fma.rn.f32 	%f145, %f36, %f142, %f145;
 
 $L__BB3_12:
-	ld.v2.f32 	{%f101, %f102}, [%rd3+24];
-	ld.f32 	%f55, [%rd3+32];
+	ld.v2.f32 	{%f101, %f102}, [%rd3+16];
+	ld.f32 	%f55, [%rd3+24];
 	abs.f32 	%f103, %f143;
 	setp.geu.f32 	%p7, %f103, 0f7F800000;
 	@%p7 bra 	$L__BB3_16;
@@ -1229,7 +1229,7 @@ $L__BB4_2:
 	call (%r41), _optix_read_primitive_idx, ();
 	// end inline asm
 	mul.lo.s32 	%r42, %r41, 3;
-	ld.u64 	%rd4, [%rd3+8];
+	ld.u64 	%rd4, [%rd3];
 	mul.wide.u32 	%rd5, %r42, 12;
 	add.s64 	%rd6, %rd4, %rd5;
 	ld.f32 	%f48, [%rd6];
@@ -1358,8 +1358,8 @@ $L__BB4_8:
 	selp.f32 	%f128, %f81, %f122, %p5;
 	selp.f32 	%f129, %f82, %f123, %p5;
 	selp.f32 	%f130, %f83, %f124, %p5;
-	ld.v2.f32 	{%f89, %f90}, [%rd3+24];
-	ld.f32 	%f35, [%rd3+32];
+	ld.v2.f32 	{%f89, %f90}, [%rd3+16];
+	ld.f32 	%f35, [%rd3+24];
 	abs.f32 	%f91, %f128;
 	setp.geu.f32 	%p6, %f91, 0f7F800000;
 	@%p6 bra 	$L__BB4_12;
@@ -1533,7 +1533,7 @@ $L__BB5_2:
 	call (%r41), _optix_read_primitive_idx, ();
 	// end inline asm
 	mul.lo.s32 	%r42, %r41, 3;
-	ld.u64 	%rd4, [%rd3+8];
+	ld.u64 	%rd4, [%rd3];
 	mul.wide.u32 	%rd5, %r42, 12;
 	add.s64 	%rd6, %rd4, %rd5;
 	ld.f32 	%f68, [%rd6];
@@ -1602,7 +1602,7 @@ $L__BB5_4:
 	mul.f32 	%f156, %f23, %f101;
 
 $L__BB5_6:
-	ld.f32 	%f36, [%rd3+36];
+	ld.f32 	%f36, [%rd3+28];
 	setp.leu.f32 	%p4, %f36, 0f00000000;
 	@%p4 bra 	$L__BB5_12;
 
@@ -1684,8 +1684,8 @@ $L__BB5_11:
 	fma.rn.f32 	%f158, %f36, %f155, %f158;
 
 $L__BB5_12:
-	ld.v2.f32 	{%f114, %f115}, [%rd3+24];
-	ld.f32 	%f55, [%rd3+32];
+	ld.v2.f32 	{%f114, %f115}, [%rd3+16];
+	ld.f32 	%f55, [%rd3+24];
 	abs.f32 	%f116, %f156;
 	setp.geu.f32 	%p7, %f116, 0f7F800000;
 	@%p7 bra 	$L__BB5_16;

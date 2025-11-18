@@ -46,7 +46,7 @@ find_package(Vulkan REQUIRED)
 include_directories("${Vulkan_INCLUDE_DIRS}")
 
 #VTK
-set(VTK_DIR "${CMAKE_SOURCE_DIR}/lib/VTK9.5.0/lib/cmake/vtk-9.5")
+set(VTK_DIR "${CMAKE_SOURCE_DIR}/lib/VTK9.5.2/lib/cmake/vtk-9.5")
 find_package(VTK REQUIRED)
 
 #OptiX着色器文件列表
@@ -101,8 +101,11 @@ add_executable(${EXECUTABLE_NAME}
         include/Global/RendererImpl.cuh
         src/Global/RendererImpl.cu
         include/Global/Shader.cuh
-        include/Global/VTKReader.cuh
-        src/Global/VTKReader.cu
+        include/Util/VTKReader.cuh
+        src/Util/VTKReader.cu
+        include/Util/ColorRamp.cuh
+        include/Global/Renderer.cuh
+        src/Global/Renderer.cu
 )
 
 #确保在链接主程序之前，所有PTX文件都已生成
@@ -121,7 +124,7 @@ if (WIN32)
 endif ()
 
 #SDL
-target_link_libraries(${EXECUTABLE_NAME} PUBLIC SDL2::SDL2)
+target_link_libraries(${EXECUTABLE_NAME} PUBLIC SDL2::SDL2 SDL2::SDL2main)
 
 #VK
 target_link_libraries(${EXECUTABLE_NAME} PUBLIC Vulkan::Vulkan)

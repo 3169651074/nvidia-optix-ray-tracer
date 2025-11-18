@@ -39,13 +39,10 @@ namespace project {
 
     //hit参数
     typedef struct HitGroupParams {
-        GeometryType geometryType;
-        MaterialType materialType;
-
         //全局几何数据，通过hit参数结构体传递，为统一访问方式，不使用内置几何信息获取函数
         //“全局几何数据”为包含命中几何体的GAS内的所有几何体
         union {
-            //球体球心数组和半径数组
+            //球体球心数组和半径数组。使用数组允许多个球体组成一个GAS
             struct {
                 float3 * centers;
                 float * radii;

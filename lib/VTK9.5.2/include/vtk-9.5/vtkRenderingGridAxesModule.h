@@ -1,0 +1,48 @@
+
+#ifndef VTKRENDERINGGRIDAXES_EXPORT_H
+#define VTKRENDERINGGRIDAXES_EXPORT_H
+
+#ifdef VTKRENDERINGGRIDAXES_STATIC_DEFINE
+#  define VTKRENDERINGGRIDAXES_EXPORT
+#  define VTKRENDERINGGRIDAXES_NO_EXPORT
+#else
+#  ifndef VTKRENDERINGGRIDAXES_EXPORT
+#    ifdef RenderingGridAxes_EXPORTS
+        /* We are building this library */
+#      define VTKRENDERINGGRIDAXES_EXPORT __declspec(dllexport)
+#    else
+        /* We are using this library */
+#      define VTKRENDERINGGRIDAXES_EXPORT __declspec(dllimport)
+#    endif
+#  endif
+
+#  ifndef VTKRENDERINGGRIDAXES_NO_EXPORT
+#    define VTKRENDERINGGRIDAXES_NO_EXPORT 
+#  endif
+#endif
+
+#ifndef VTKRENDERINGGRIDAXES_DEPRECATED
+#  define VTKRENDERINGGRIDAXES_DEPRECATED __declspec(deprecated)
+#endif
+
+#ifndef VTKRENDERINGGRIDAXES_DEPRECATED_EXPORT
+#  define VTKRENDERINGGRIDAXES_DEPRECATED_EXPORT VTKRENDERINGGRIDAXES_EXPORT VTKRENDERINGGRIDAXES_DEPRECATED
+#endif
+
+#ifndef VTKRENDERINGGRIDAXES_DEPRECATED_NO_EXPORT
+#  define VTKRENDERINGGRIDAXES_DEPRECATED_NO_EXPORT VTKRENDERINGGRIDAXES_NO_EXPORT VTKRENDERINGGRIDAXES_DEPRECATED
+#endif
+
+/* NOLINTNEXTLINE(readability-avoid-unconditional-preprocessor-if) */
+#if 0 /* DEFINE_NO_DEPRECATED */
+#  ifndef VTKRENDERINGGRIDAXES_NO_DEPRECATED
+#    define VTKRENDERINGGRIDAXES_NO_DEPRECATED
+#  endif
+#endif
+
+/* VTK-HeaderTest-Exclude: vtkRenderingGridAxesModule.h */
+
+/* Include ABI Namespace */
+#include "vtkABINamespace.h"
+
+#endif /* VTKRENDERINGGRIDAXES_EXPORT_H */

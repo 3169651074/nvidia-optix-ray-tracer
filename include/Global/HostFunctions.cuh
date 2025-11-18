@@ -75,6 +75,7 @@ using namespace Microsoft::WRL;
 #include <array>
 #include <vector>
 #include <stack>
+#include <deque>
 
 #include <cmath>
 #include <cstring>
@@ -163,6 +164,14 @@ namespace project {
     #define D3D_ERROR_EXIT_CODE (-500)
     extern void _D3DCheckError(HRESULT result, const char * file, const char * function, int line);
 #define D3DCheckError(result) _D3DCheckError(result, __FILE__, __func__, __LINE__)
+
+    // ====== 辅助宏 ======
+#define lengthOf(cArrayInPlace) (sizeof(cArrayInPlace) / sizeof(cArrayInPlace[0]))
+#define freeVector(vec)     \
+    do {                    \
+        vec.clear();        \
+        vec.shrink_to_fit();\
+    } while (false)
 }
 
 #endif //RENDEREROPTIX_HOSTFUNCTIONS_CUH
