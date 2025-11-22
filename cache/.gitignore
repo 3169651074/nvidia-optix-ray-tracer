@@ -1,0 +1,4 @@
+# 忽略该文件夹下所有文件
+*
+# 但保留 .gitignore 文件本身
+!.gitignore

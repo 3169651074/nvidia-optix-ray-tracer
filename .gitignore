@@ -1,8 +1,4 @@
 .idea/
-cmake-build-debug*/
-!cache/.gitkeep
-cache/
-!bin/.gitkeep
-bin/
+*build*/
 .vs/
 .vscode/
