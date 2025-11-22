@@ -8,6 +8,8 @@ RendererOptiX 是一个高性能实时渲染器，使用 NVIDIA OptiX 9.0 进行
 
 **本项目作为使用OptiX实现的较为基础的项目，可以作为NVIDIA OptiX库的入门示例，为GPU光线追踪器和OptiX API学习者提供参考。**
 
+**仓库文件中在files/particle_mesh中提供了一组VTK粒子示例以及一个.series文件，可以使用这些示例来验证渲染器工作**
+
 ## 功能特性
 
 - **高性能光线追踪**：基于 NVIDIA OptiX 9.0 实现
