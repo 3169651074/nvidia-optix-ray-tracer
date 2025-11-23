@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 4.0)
 set(EXECUTABLE_NAME "RendererOptiX")
 
+#CACHE PATH会将路径写入缓存文件，修改后需要删除所有CMake缓存并重新生成
+
 #CUDA
 if (WIN32)
     set(CMAKE_CUDA_COMPILER_DEFAULT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.0/bin/nvcc.exe")
@@ -19,8 +21,7 @@ endif ()
 
 #SDL
 if (WIN32)
-    #set(CONFIG_SDL2_DIR_DEFAULT "C:/SDL2/lib/cmake")
-    set(CONFIG_SDL2_DIR_DEFAULT "C:/Users/Lenovo/Desktop/RendererOptiX-main/SDL/install/cmake")
+    set(CONFIG_SDL2_DIR_DEFAULT "C:/SDL2/cmake")
 else ()
     #若手动编译SDL库，则在此处设置路径，否则无需更改
     set(CONFIG_SDL2_DIR_DEFAULT "")
@@ -35,8 +36,7 @@ endif ()
 
 #VTK
 if (WIN32)
-    #set(CONFIG_VTK_DIR_DEFAULT "C:/VTK-9.5.2/lib/cmake/vtk-9.5")
-    set(CONFIG_VTK_DIR_DEFAULT "C:/Users/Lenovo/Desktop/RendererOptiX-main/VTK/install/lib/cmake/vtk-9.5")
+    set(CONFIG_VTK_DIR_DEFAULT "C:/VTK-9.5.0/lib/cmake/vtk-9.5")
 else ()
     set(CONFIG_VTK_DIR_DEFAULT "~/Public/VTK-9.5.2/lib/cmake/vtk-9.5")
 endif ()
