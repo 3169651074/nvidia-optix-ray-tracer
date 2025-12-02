@@ -15,7 +15,11 @@
 //不能包含VTKReader.cuh或其他任何项目头文件，否则会引入OptiX头文件导致编译失败
 //包含必要的环境头文件，这些头文件可以被GCC所识别
 #include <cuda_runtime.h>
+#ifdef _WIN32
+#include <SDL.h>
+#else
 #include <SDL2/SDL.h>
+#endif
 
 #define VTK_READER_ERROR_EXIT_CODE (-1)
 namespace vtk_reader {
