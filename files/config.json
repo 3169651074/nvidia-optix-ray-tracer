@@ -1,10 +1,13 @@
 {
+  "mesh": false,
   "series-path": "../files/",
   "series-name": "particle.vtk.series",
   "cache-path": "../cache/",
-  "cache": true,
+  "stl-path": "../files/shape/separated/",
+  "cache": false,
   "debug-mode": false,
   "cache-process-thread-count": 8,
+  "particle-material-preset": "terrain",
   "roughs": [
     {"albedo": [0.65, 0.05, 0.05]},
     {"albedo": [0.73, 0.73, 0.73]},
@@ -30,7 +33,7 @@
     "api": "VK",
     "window-width": 1200,
     "window-height": 800,
-    "fps": 60,
+    "fps": 240,
     "camera-center": [5.0, 0.0, 0.0],
     "camera-target": [0.0, 0.0, 0.0],
     "up-direction": [0.0, 0.0, 1.0],

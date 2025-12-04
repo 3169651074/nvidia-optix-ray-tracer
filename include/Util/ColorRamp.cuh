@@ -129,7 +129,7 @@ namespace project {
         }
     }
 
-    static inline ColorRampPreset resolveColorRampPreset(int argc, char *argv[]) {
+    static inline ColorRampPreset resolveColorRampPreset(const std::string & particleMaterials) {
         const std::unordered_map<std::string, ColorRampPreset> mapping = {
                 {"viridis",   ColorRampPreset::Viridis},
                 {"plasma",    ColorRampPreset::Plasma},
@@ -139,18 +139,16 @@ namespace project {
                 {"grayscale", ColorRampPreset::Grayscale}
         };
 
-        const std::string prefix = "--color-ramp=";
-        for (int i = 1; i < argc; ++i) {
-            std::string arg(argv[i]);
-            if (arg.rfind(prefix, 0) != 0) continue;
-
-            const auto iter = mapping.find(toLower(arg.substr(prefix.size())));
-            if (iter != mapping.end()) {
-                return iter->second;
-            }
-            SDL_Log("Unknown color ramp preset: %s. Falling back to default.", arg.c_str());
+        //忽略大小写：将输入转换为小写
+        std::string s = particleMaterials;
+        std::transform(s.begin(), s.end(), s.begin(),
+                       [](unsigned char c){ return std::tolower(c); });
+        try {
+            return mapping.at(s);
+        } catch (const std::out_of_range & e) {
+            SDL_Log("Error when processing color preset: no such value!");
+            return ColorRampPreset::Viridis;
         }
-        return ColorRampPreset::Viridis;
     }
 }
 

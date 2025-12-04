@@ -15,11 +15,9 @@
 //不能包含VTKReader.cuh或其他任何项目头文件，否则会引入OptiX头文件导致编译失败
 //包含必要的环境头文件，这些头文件可以被GCC所识别
 #include <cuda_runtime.h>
-#ifdef _WIN32
-#include <SDL.h>
-#else
 #include <SDL2/SDL.h>
-#endif
+
+#include <atomic>
 
 #define VTK_READER_ERROR_EXIT_CODE (-1)
 namespace vtk_reader {
@@ -253,8 +251,8 @@ namespace vtk_reader {
         return {positions, ids, quaternions, velocities, shapeIDs};
     }
 
-    std::vector<
-            std::pair<float3, std::array<float3, 3>>
+    std::pair<
+            std::vector<float3>, std::vector<float3>
     > readSTLFile(const std::string & filePath) {
         SDL_Log("Reading STL file: %s", filePath.c_str());
 
@@ -272,8 +270,9 @@ namespace vtk_reader {
 
         const auto triangleCount = polyData->GetNumberOfCells();
         SDL_Log("Triangle count: %lld", triangleCount);
-        std::vector<std::pair<float3, std::array<float3, 3>>> data;
-        data.reserve(triangleCount);
+
+        std::vector<float3> vertexDatas; vertexDatas.reserve(triangleCount * 3);
+        std::vector<float3> normalDatas; normalDatas.reserve(triangleCount);
 
         //由于vtkSTLReader会忽略STL文件的法线数据，则使用VTK计算整个文件的顶点法线
         //此处需求和mesh文件相反：此处计算Cell的法向量，不计算Point的法向量
@@ -295,28 +294,29 @@ namespace vtk_reader {
 
         for (vtkIdType i = 0; i < triangleCount; i++) {
             //获取顶点
-            std::array<float3, 3> vertexData = {};
             vtkCell * cell = polyData->GetCell(i);
             for (int j = 0; j < 3; j++) {
                 double vertex[3];
                 polyData->GetPoint(cell->GetPointId(j), vertex);
-                vertexData[j].x = static_cast<float>(vertex[0]);
-                vertexData[j].y = static_cast<float>(vertex[1]);
-                vertexData[j].z = static_cast<float>(vertex[2]);
+
+                vertexDatas.push_back({
+                    static_cast<float>(vertex[0]),
+                    static_cast<float>(vertex[1]),
+                    static_cast<float>(vertex[2]),
+                });
             }
 
             //获取法线
-            float3 normalData;
             double normal[3];
             normals->GetTuple(i, normal);
-            normalData.x = static_cast<float>(normal[0]);
-            normalData.y = static_cast<float>(normal[1]);
-            normalData.z = static_cast<float>(normal[2]);
 
-            //添加到数组
-            data.emplace_back(normalData, vertexData);
+            normalDatas.push_back({
+                static_cast<float>(normal[0]),
+                static_cast<float>(normal[1]),
+                static_cast<float>(normal[2]),
+            });
         }
 
-        return data;
+        return {vertexDatas, normalDatas};
     }
 }

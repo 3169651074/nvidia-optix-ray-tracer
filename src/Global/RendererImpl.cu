@@ -86,6 +86,29 @@ namespace project {
 
         return {handle, dev_output};
     }
+    GAS buildParticleGASImpl(
+            OptixDeviceContext & context,
+            const float3 * dev_vertices, size_t vertexCount, cudaStream_t stream)
+    {
+        const OptixAccelBuildOptions buildOptions = {
+                .buildFlags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION | OPTIX_BUILD_FLAG_PREFER_FAST_TRACE,
+                .operation = OPTIX_BUILD_OPERATION_BUILD
+        };
+        const unsigned int buildInputFlags[1] = {OPTIX_GEOMETRY_FLAG_NONE};
+        const OptixBuildInput buildInput = {
+                .type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES,
+                .triangleArray = {
+                        .vertexBuffers = reinterpret_cast<const CUdeviceptr *>(&dev_vertices),
+                        .numVertices = static_cast<unsigned int>(vertexCount),
+                        .vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3,
+                        .vertexStrideInBytes = sizeof(float3),
+                        .flags = buildInputFlags,
+                        .numSbtRecords = 1
+                }
+        };
+
+        return buildASImpl(context, buildOptions, buildInput, true, stream);
+    }
 
     GAS buildGASForSpheres(
             OptixDeviceContext & context, const RendererSphere & spheres, cudaStream_t stream)
@@ -140,24 +163,12 @@ namespace project {
     GAS buildGASForParticle(
             OptixDeviceContext & context, const RendererMeshParticle & particle, cudaStream_t stream)
     {
-        const OptixAccelBuildOptions buildOptions = {
-                .buildFlags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION | OPTIX_BUILD_FLAG_PREFER_FAST_TRACE,
-                .operation = OPTIX_BUILD_OPERATION_BUILD
-        };
-        const unsigned int buildInputFlags[1] = {OPTIX_GEOMETRY_FLAG_NONE};
-        const OptixBuildInput buildInput = {
-                .type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES,
-                .triangleArray = {
-                        .vertexBuffers = reinterpret_cast<const CUdeviceptr *>(&particle.dev_vertices),
-                        .numVertices = static_cast<unsigned int>(particle.count * 3),
-                        .vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3,
-                        .vertexStrideInBytes = sizeof(float3),
-                        .flags = buildInputFlags,
-                        .numSbtRecords = 1
-                }
-        };
-
-        return buildASImpl(context, buildOptions, buildInput, true, stream);
+        return buildParticleGASImpl(context, particle.dev_vertices, particle.triangleCount * 3, stream);
+    }
+    GAS buildGASForParticle(
+            OptixDeviceContext & context, const RendererTimeParticleData & particle, cudaStream_t stream)
+    {
+        return buildParticleGASImpl(context, particle.dev_vertices, particle.triangleCount * 3, stream);
     }
 
     IAS buildIAS(
@@ -542,8 +553,8 @@ namespace project {
 
     std::vector<HitGroupSbtRecord> createVTKParticleSBTRecord(
             OptixProgramGroup & triangleRoughProgramGroup, OptixProgramGroup & triangleMetalProgramGroup,
-            const std::vector<RendererMeshParticle> & particles,
-            const RendererMaterial & globalMaterials, size_t materialOffset)
+            const std::vector<std::pair<size_t, float3 *>> & particles,
+            const RendererMaterial & globalMaterials)
     {
         std::vector<HitGroupSbtRecord> records;
         records.reserve(particles.size());
@@ -552,12 +563,12 @@ namespace project {
             HitGroupSbtRecord record = {};
 
             //设置顶点法线指针
-            record.data.triangles.vertexNormals = particle.dev_normals;
+            record.data.triangles.vertexNormals = particle.second;
 
             //粗糙材质
             optixCheckError(optixSbtRecordPackHeader(
                     triangleRoughProgramGroup, &record));
-            record.data.rough.albedo = globalMaterials.roughs[particle.id + materialOffset];
+            record.data.rough.albedo = globalMaterials.roughs[particle.first];
             records.push_back(record);
         }
         return records;

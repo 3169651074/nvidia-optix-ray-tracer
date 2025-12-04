@@ -41,7 +41,9 @@ namespace project {
     std::tuple<
             GeometryData, MaterialData, RenderLoopData,
             std::vector<std::array<float, 12>>,
-            std::string, std::string, std::string, bool, bool, size_t
+            std::string, std::string, std::string, std::string,
+            std::string, bool, bool, bool,
+            size_t
     > ProgramArgumentParser::parseProgramArguments() {
         SDL_Log("Parsing program arguments from JSON file: %s", CONFIG_FILE_PATH);
 
@@ -96,15 +98,21 @@ namespace project {
             } else if (apiTypeStr == "VK") {
                 apiType = SDL_GraphicsWindowAPIType::VULKAN;
 #ifdef _WIN32
-                } else if (apiTypeStr == "D3D11") {
-                    apiType = SDL_GraphicsWindowAPIType::DIRECT3D11;
-                } else if (apiTypeStr == "D3D12") {
-                    apiType = SDL_GraphicsWindowAPIType::DIRECT3D12;
+            } else if (apiTypeStr == "D3D11") {
+                apiType = SDL_GraphicsWindowAPIType::DIRECT3D11;
+            } else if (apiTypeStr == "D3D12") {
+                apiType = SDL_GraphicsWindowAPIType::DIRECT3D12;
 #endif
             } else {
                 SDL_Log(R"(Invalid api type, must be "OGL", "VK", "D3D11" or "D3D12"!)");
                 exit(COMMAND_PARSER_ERROR_EXIT_CODE);
             }
+            const auto isMesh = data.at("mesh").get<bool>();
+            const auto seriesFilePath = data.at("series-path").get<std::string>();
+            const auto seriesFileName = data.at("series-name").get<std::string>();
+            const auto cacheFilePath = data.at("cache-path").get<std::string>();
+            const auto stlFilePath = data.at("stl-path").get<std::string>();
+            const auto particleMaterials = data.at("particle-material-preset").get<std::string>();
             const auto windowWidth = loopData["window-width"].get<int>();
             const auto windowHeight = loopData["window-height"].get<int>();
             const auto targetFPS = loopData["fps"].get<size_t>();
@@ -119,6 +127,8 @@ namespace project {
             const auto cameraSpeedStride = loopData["camera-speed-stride"].get<float>();
             const auto initialSpeedRatio = loopData["camera-initial-speed-ratio"].get<size_t>();
             const auto isDebugMode = data.at("debug-mode").get<bool>();
+            const auto isCache = data.at("cache").get<bool>();
+            const auto threadCount = data.at("cache-process-thread-count").get<size_t>();
 
             const RenderLoopData retLoopData(
                     apiType,
@@ -139,14 +149,9 @@ namespace project {
             file.close();
 
             return {
-                    geoData, matData, retLoopData,
-                    sphereTransforms,
-                    data.at("series-path").get<std::string>(),
-                    data.at("series-name").get<std::string>(),
-                    data.at("cache-path").get<std::string>(),
-                    data.at("cache").get<bool>(),
-                    isDebugMode,
-                    data.at("cache-process-thread-count").get<size_t>()
+                    geoData, matData, retLoopData, sphereTransforms,
+                    seriesFilePath, seriesFileName, cacheFilePath, stlFilePath,
+                    particleMaterials, isMesh, isDebugMode, isCache, threadCount
             };
         } catch (json::parse_error & e) {
             SDL_Log("JSON parsing error: %s", e.what());

@@ -11,12 +11,16 @@
 ## 文件路径配置
 
 ```json
+//是否为mesh输入：当每个VTK文件都包含完整的粒子几何时为mesh输入
+"mesh": false,
 //.vtk.series文件路径
 "series-path": "../files/",
 //.vtk.series文件名
-"series-name": "particle_mesh-short.vtk.series",
-//生成的缓存文件存放路径
+"series-name": "particle.vtk.series",
+//生成的缓存文件存放路径（OptiX缓存和mesh模式下数据缓存）
 "cache-path": "../cache/",
+//非mesh输入时，STL文件的路径
+"stl-path": "../files/shape/separated/",
 ```
 
 **注意**：
@@ -45,6 +49,17 @@
 ```
 
 ## 材质配置
+
+### 粒子材质颜色预设
+
+**类型**：string  
+**说明**：用于生成粒子材质的色带  
+**值**：从以下值中任意选择一个，不区分大小写
+```json
+"viridis" "plasma" "spectral"
+"terrain" "heatmap" "grayscale"
+```
+若需要其他颜色映射，请参考`include/Util/ColorRamp.cuh`的实现，自行添加颜色映射枚举
 
 ### roughs
 

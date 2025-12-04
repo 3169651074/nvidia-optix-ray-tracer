@@ -3,8 +3,6 @@
 
 #include <Util/ColorRamp.cuh>
 #include <Util/VTKMeshReader.cuh>
-#include <thread>
-#include <atomic>
 
 /*
  * 全局共用：额外几何体及其GAS；材质数据 = 额外材质数据 + VTK材质数据，全局使用一个材质数组
@@ -61,7 +59,7 @@ namespace project {
     public:
         //初始化渲染器
         static RendererMeshData commitRendererData(
-                GeometryData & addGeoData, MaterialData & addMatData,
+                GeometryData & addGeoData, MaterialData & addMatData, const std::string particleMaterials,
                 const std::string & seriesFilePath, const std::string & seriesFileName,
                 const std::string & cacheFilePath, bool isDebugMode, size_t maxCacheLoadThreadCount);
 

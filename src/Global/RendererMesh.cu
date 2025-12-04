@@ -91,7 +91,7 @@ namespace project {
 
     //子线程函数
     void readVTKFileCache(
-            size_t currentFileIndex, size_t totalFileCount, size_t materialOffset,
+            size_t currentFileIndex, size_t totalFileCount,
             const std::string & currentCacheFilePathName, std::atomic<size_t> & processedFileCount,
             const std::vector<GAS> & addGAS, RendererMeshData & data)
     {
@@ -167,7 +167,7 @@ namespace project {
     }
 
     RendererMeshData RendererMesh::commitRendererData(
-            GeometryData & addGeoData, MaterialData & addMatData,
+            GeometryData & addGeoData, MaterialData & addMatData, const std::string particleMaterials,
             const std::string & seriesFilePath, const std::string & seriesFileName,
             const std::string & cacheFilePath, bool isDebugMode, size_t maxCacheLoadThreadCount)
     {
@@ -196,7 +196,6 @@ namespace project {
         data.sbtAllFiles.reserve(fileCount);
 
         //多线程读取VTK缓存文件
-        std::vector<std::thread> threads;
         std::atomic<size_t> processedFileCount(0);
 
         //启动线程数不超过设定的最大值，防止CPU占用过高
@@ -207,7 +206,7 @@ namespace project {
         for (size_t i = 0; i < fileCount; i++) {
             workers.emplace_back(
                     readVTKFileCache,
-                    i, fileCount, data.materialAllFiles.roughs.size(),
+                    i, fileCount,
                     cacheFilePath + "particle" + std::to_string(i) + ".cache",
                     std::ref(processedFileCount),
                     std::cref(data.addGAS),
@@ -218,18 +217,14 @@ namespace project {
                 workers.pop_front();
             }
         }
-        //等待剩余线程完成
-        while (!workers.empty()) {
-            workers.front().join();
-            workers.pop_front();
-        }
 
         //在等待线程执行时主线程生成材质。所有VTK文件的所有粒子使用同一个材质数组，和额外材质数组组合为全局材质数组
         //使用颜色映射器和最大粒子数生成VTK材质数组
-        const auto rampPreset = ColorRampPreset::Terrain;
+        SDL_Log("Generating materials...");
+        const auto rampPreset = resolveColorRampPreset(particleMaterials);
+        SDL_Log("Using color ramp preset: %s", presetName(rampPreset));
         const auto maxCellCountSingleFile = VTKMeshReader::readMaxCellCountAllVTKFile(cacheFilePath);
         const auto vtkMaterials = bakeColorRamp(colorStopsForPreset(rampPreset), maxCellCountSingleFile);
-        SDL_Log("Using color ramp preset: %s", presetName(rampPreset));
 
         //将粒子材质数组插入到额外材质数组的尾部
         const size_t materialOffset = data.materialAllFiles.roughs.size();
@@ -238,6 +233,7 @@ namespace project {
                 vtkMaterials.begin(), vtkMaterials.end());
 
         //创建模块和管线，所有文件都相同
+        SDL_Log("Initializing OptiX...");
         const OptixPipelineCompileOptions pipelineCompileOptions = {
                 .usesMotionBlur = 0,
                 .traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY,
@@ -252,8 +248,9 @@ namespace project {
         data.pipeline = linkPipeline(data.context, data.programGroups, pipelineCompileOptions);
 
         //等待所有线程完成
-        for (auto & t: threads) {
-            t.join();
+        while (!workers.empty()) {
+            workers.front().join();
+            workers.pop_front();
         }
 
         //为每个文件创建着色器绑定表。由于创建SBT需要全局材质数组，则不能并行
@@ -272,9 +269,15 @@ namespace project {
 
         for (size_t i = 0; i < fileCount; i++) {
             //创建VTK粒子的SBT记录
+            std::vector<std::pair<size_t, float3 *>> particleSBTData;
+            particleSBTData.reserve(data.vtkParticleAllFiles[i].size());
+
+            for (const auto & particle : data.vtkParticleAllFiles[i]) {
+                particleSBTData.emplace_back(particle.id + materialOffset, particle.dev_normals);
+            }
             auto sbtRecords = createVTKParticleSBTRecord(
                     data.programGroups[4], data.programGroups[5],
-                    data.vtkParticleAllFiles[i], data.materialAllFiles, materialOffset);
+                    particleSBTData, data.materialAllFiles);
 
             //将当前文件的VTK SBT记录和额外几何体的记录合并
             //每个文件的所有实例都需要对应一个SBT记录，额外几何体的SBT记录需要在每个文件的记录列表中拷贝一份
@@ -405,7 +408,7 @@ namespace project {
                         reinterpret_cast<void *>(data.raygenMissPtr.first + OPTIX_SBT_RECORD_HEADER_SIZE),
                         &raygenData, sizeof(RayGenParams), cudaMemcpyHostToDevice));
 
-                //更新IAS
+                //更新全局参数
                 params.handle = std::get<0>(asThisFile.ias);
                 cudaCheckError(cudaMemcpy(reinterpret_cast<void *>(dev_params),&params, sizeof(GlobalParams),cudaMemcpyHostToDevice));
 

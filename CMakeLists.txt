@@ -143,7 +143,9 @@ file(GLOB_RECURSE SRCS
 )
 add_executable(${EXECUTABLE_NAME} ${SRCS}
         include/Global/RendererTime.cuh
-        src/Global/RendererTime.cu)
+        src/Global/RendererTime.cu
+        include/Util/VTKTimeReader.cuh
+        src/Util/VTKTimeReader.cu)
 
 #确保在链接主程序之前，所有PTX文件都已生成
 add_dependencies(${EXECUTABLE_NAME} OPTIX_SHADERS)

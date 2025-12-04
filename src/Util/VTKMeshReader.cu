@@ -2,7 +2,6 @@
 using namespace project;
 
 //C++
-#include <atomic>
 #include <filesystem>
 namespace filesystem = std::filesystem; //using用于类型别名，不能用于命名空间别名
 
@@ -254,7 +253,7 @@ namespace project {
                 .velocity = velocity,
                 .dev_vertices = dev_vertices,
                 .dev_normals = dev_normals,
-                .count = vertexCount / 3
+                .triangleCount = vertexCount / 3
             });
         }
 

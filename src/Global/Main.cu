@@ -10,33 +10,38 @@ static void updateInstancesTransforms(
 
 #undef main
 int main(int argc, char * argv[]) {
-#ifdef MESH
     //解析JSON参数
     auto [geoData, matData, loopData, transforms,
-          seriesFilePath, seriesFileName, cacheFilePath,
-          isWriteCache, isDebugMode,
+          seriesFilePath, seriesFileName, cacheFilePath, stlFilePath,
+          particleMaterials, isMesh, isDebugMode, isWriteCache,
           cacheProcessThreadCount] = ProgramArgumentParser::parseProgramArguments();
     const size_t maxCacheLoadThreadCount = std::max<size_t>(1, cacheProcessThreadCount);
-    if (isWriteCache) {
-        RendererMesh::writeCacheFilesAndExit(seriesFilePath, seriesFileName, cacheFilePath, maxCacheLoadThreadCount);
+    instanceTransforms = std::move(transforms);
+
+    if (isMesh) {
+        //Mesh输入
+        if (isWriteCache) {
+            RendererMesh::writeCacheFilesAndExit(seriesFilePath, seriesFileName, cacheFilePath, maxCacheLoadThreadCount);
+        }
+
+        auto data = RendererMesh::commitRendererData(
+                geoData, matData, particleMaterials,
+                seriesFilePath, seriesFileName, cacheFilePath,
+                isDebugMode, maxCacheLoadThreadCount);
+        RendererMesh::setAddGeoInsUpdateFunc(data, &updateInstancesTransforms);
+        RendererMesh::startRender(data, loopData);
+        RendererMesh::freeRendererData(data);
+    } else {
+        //Time输入
+        auto data = RendererTime::commitRendererData(
+                geoData, matData, particleMaterials,
+                seriesFilePath, seriesFileName,
+                stlFilePath, cacheFilePath,
+                isDebugMode, maxCacheLoadThreadCount);
+        RendererTime::setAddGeoInsUpdateFunc(data, &updateInstancesTransforms);
+        RendererTime::startRender(data, loopData);
+        RendererTime::freeRendererData(data);
     }
-    instanceTransforms = transforms;
 
-    //提交几何体，粒子文件信息和材质数据
-    auto data = RendererMesh::commitRendererData(
-            geoData, matData,
-            seriesFilePath, seriesFileName, cacheFilePath,
-            isDebugMode, maxCacheLoadThreadCount);
-    RendererMesh::setAddGeoInsUpdateFunc(data, &updateInstancesTransforms);
-
-    //启动交互
-    RendererMesh::startRender(data, loopData);
-
-    //清理资源
-    RendererMesh::freeRendererData(data);
     return 0;
-#elifdef TIME
-#else
-
-#endif
 }

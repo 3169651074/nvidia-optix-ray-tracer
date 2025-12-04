@@ -212,7 +212,7 @@ VTK 序列文件是 JSON 格式：
 
 ### 缓存文件格式
 
-每个 VTK 文件对应一个缓存文件：
+在Mesh模式下，每个 VTK 文件对应一个缓存文件：
 
 ```text
 particleXX.cache:

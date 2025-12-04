@@ -86,17 +86,24 @@ namespace project {
         //同三角形，dev_vertices/dev_normals的长度为3倍count
         float3 * dev_vertices;
         float3 * dev_normals;
-        size_t count;
+        size_t triangleCount;
     } RendererMeshParticle;
 
-    //一个VTK文件信息，仅包含粒子的非几何信息
-    typedef struct RendererTimeParticle {
+    //一个VTK粒子，仅包含非几何信息
+    typedef struct RendererTimeParticleReference {
         float3 position;    //粒子中心位置
         size_t id;
         float4 quat;        //旋转四元数
         float3 velocity;    //速度
         size_t shapeID;     //几何类型索引
-    } RendererTimeParticle;
+    } RendererTimeParticleReference;
+
+    //粒子几何信息，同MeshParticle
+    typedef struct RendererTimeParticleData {
+        float3 * dev_vertices;
+        float3 * dev_normals;
+        size_t triangleCount;
+    } RendererTimeParticleData;
 
     //所有材质。VTK粒子材质偏移量为额外Rough材质数量
     typedef struct RendererMaterial {
@@ -153,6 +160,8 @@ namespace project {
             OptixDeviceContext & context, const RendererTriangle & triangles, cudaStream_t stream = nullptr);
     GAS buildGASForParticle(
             OptixDeviceContext & context, const RendererMeshParticle & particle, cudaStream_t stream = nullptr);
+    GAS buildGASForParticle(
+            OptixDeviceContext & context, const RendererTimeParticleData & particle, cudaStream_t stream = nullptr);
 
     //构建IAS
     IAS buildIAS(
@@ -205,8 +214,8 @@ namespace project {
     //创建一个文件所有VTK粒子的记录，每个RendererParticle一个记录
     std::vector<HitGroupSbtRecord> createVTKParticleSBTRecord(
             OptixProgramGroup & triangleRoughProgramGroup, OptixProgramGroup & triangleMetalProgramGroup,
-            const std::vector<RendererMeshParticle> & particles,
-            const RendererMaterial & globalMaterials, size_t materialOffset);
+            const std::vector<std::pair<size_t, float3 *>> & particles,
+            const RendererMaterial & globalMaterials);
 
     //释放一组SBT记录的设备内存
     void freeSBTRecords(std::vector<SBT> & sbtAllfiles);

@@ -95,6 +95,7 @@ using namespace Microsoft::WRL;
 #include <random>
 #include <chrono>
 #include <thread>
+#include <atomic>
 #include <fstream>
 #include <sstream>
 

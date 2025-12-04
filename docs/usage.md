@@ -12,12 +12,17 @@
 
 VTK文件格式需要匹配src/Util/VTKReaderImpl.cpp中的文件读取方式。若已有VTK文件格式和以下格式不同，则应修改VTKReaderImpl.cpp以匹配当前文件格式
 
-每个VTK文件需要包括：
+- 若使用Mesh模式，每个VTK文件需要包括：
 
-- 一个包含一组Cell的vtkPolyData，全部Cell类型为 vtkTriangleStrip
-- vtkDataArray1：id  --整数数组
-- vtkDataArray2：vel --每个元素包含三个浮点数的速度数组
-- 每个Cell需要包含一组顶点坐标，并能被vtkPolyDataNormals用于计算顶点法线
+1. 一个包含一组Cell的vtkPolyData，全部Cell类型为 vtkTriangleStrip
+2. vtkDataArray1：id  --整数数组
+3. vtkDataArray2：vel --每个元素包含三个浮点数的速度数组
+4. 每个Cell需要包含一组顶点坐标，并能被vtkPolyDataNormals用于计算顶点法线
+
+- 若使用普通模式，每个VTK文件需要包括：
+  
+1. 每个粒子的中心位置，ID，旋转四元数，速度，形状ID
+2. 一组存储几何数据的STL文件，所有STL文件都将被读取，并按文件名的字典顺序和粒子的形状ID属性进行匹配，此时每个VTK文件无需包含粒子几何信息
 
 ## 2. 配置项目
 
@@ -25,17 +30,27 @@ VTK文件格式需要匹配src/Util/VTKReaderImpl.cpp中的文件读取方式。
 
 ```json
 {
-  "series-path": "../files/",
-  "series-name": "particle_mesh-short.vtk.series",
-  "cache-path": "../cache/"
+  "mesh": true/false,
+  "series-path": "",
+  "series-name": "",
+  "cache-path": "",
+  "cache": true/false //仅在mesh输入时需要设置
+  "stl-path": ""      //仅在非mesh输入时需要设置
 }
 ```
 
 ## 3. 运行程序
 
+- Mesh输入：
+
 1. 将config.json中的cache属性设置为true，生成缓存文件
 2. 将cache改为false，再次运行程序，开始循环渲染粒子动画
 3. 每一帧，所有粒子的位置根据当前加载的VTK文件和粒子的速度确定，渲染器会使用速度和帧数量计算帧位移
+
+- 非Mesh输入：
+
+1. 正确放置VTK文件、STL文件和Series文件
+2. 直接运行可执行程序即可
 
 ## 4. 交互控制
 
@@ -61,7 +76,7 @@ VTK文件格式需要匹配src/Util/VTKReaderImpl.cpp中的文件读取方式。
 
 ## 5. 注意事项
 
-- 什么时候需要重新生成缓存
+- Mesh输入下，什么时候需要重新生成缓存
 
 1. series文件引用的任何一个VTK文件被修改
 2. 操作系统使用不同的二进制内存布局，如小端序 -- 大端序
@@ -119,4 +134,4 @@ static void updateInstancesTransforms(
 }
 ```
 
-- 修改完成后，需要重新编译项目，但无需重新生成缓存文件
+- 修改完成后，需要重新编译项目，但无需重新生成缓存文件（Mesh输入）
