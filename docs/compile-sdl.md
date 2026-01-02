@@ -1,14 +1,14 @@
-# SDL2库编译指南
+# SDL2 Library Compilation Guide
 
-本指南包含了SDL2/SDL3库从源代码编译的方法，并附加SDL扩展库SDL_ttf的编译方法。其他SDL扩展库如SDL_mixer，可以参看ttf库的编译配置方式。
+This guide contains instructions for compiling SDL2/SDL3 libraries from source code, with additional compilation methods for the SDL extension library SDL_ttf. Other SDL extension libraries such as SDL_mixer can refer to the compilation configuration method of the ttf library.
 
-## 下载源代码
+## Download Source Code
 
-从[SDL的GitHub仓库](https://github.com/libsdl-org/SDL)下载最新的Release版本源代码。注意最新Release为SDL3。若需要SDL2，请在Release列表中查找。
+Download the latest Release version source code from [SDL's GitHub repository](https://github.com/libsdl-org/SDL). Note that the latest Release is SDL3. If you need SDL2, please search in the Release list.
 
-## 解压源代码
+## Extract Source Code
 
-创建一个新文件夹，包含build、install、source文件夹，并解压缩源代码到source目录：
+Create a new folder containing build, install, and source folders, and extract the source code to the source directory:
 
 ```text
 SDL/
@@ -19,27 +19,27 @@ SDL/
         CMakeLists.txt
 ```
 
-## 配置CMake项目
+## Configure CMake Project
 
-MSVC为多配置编译器，在配置时不指定Debug/Release，在编译和安装时均需要指定；MinGW/GCC为单配置编译器，在配置时指定Debug/Release，编译和安装时无需指定。
+MSVC is a multi-configuration compiler that does not specify Debug/Release during configuration, but needs to specify it during compilation and installation; MinGW/GCC are single-configuration compilers that specify Debug/Release during configuration and do not need to specify it during compilation and installation.
 
 ### Windows
 
-在build目录下打开命令行，使用配置命令：
+Open a command line in the build directory and use the configuration command:
 
 ```cmd
 cmake ../source -G "Visual Studio 17 2022" -DCMAKE_INSTALL_PREFIX="../install"
 ```
 
-编译：
+Compile:
 
 ```cmd
 cmake --build . --config Release --parallel
-或
-cmake --build . --config Release -j CPU线程数
+or
+cmake --build . --config Release -j CPU_thread_count
 ```
 
-安装：
+Install:
 
 ```cmd
 cmake --install . --config Release
@@ -47,29 +47,29 @@ cmake --install . --config Release
 
 ### Linux
 
-在build目录下配置：
+Configure in the build directory:
 
 ```bash
 cmake ../source -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="../install" -DCMAKE_BUILD_TYPE=Release
 ```
 
-编译：
+Compile:
 
 ```bash
 cmake --build . --parallel
 ```
 
-安装：
+Install:
 
 ```bash
 cmake --install .
 ```
 
-- 若使用CMake GUI，除了CMAKE_INSTALL_PREFIX设置为install文件夹、CMAKE_BUILD_TYPE设置为Release，其他选项保持默认即可。
+- If using CMake GUI, set CMAKE_INSTALL_PREFIX to the install folder and CMAKE_BUILD_TYPE to Release, keeping other options at their defaults.
 
-## 在当前项目中使用安装文件
+## Using Installation Files in Current Project
 
-安装完成后，在install文件夹下，可以看到SDL库编译后的文件：
+After installation is complete, in the install folder, you can see the compiled SDL library files:
 
 ```text
 install/
@@ -84,22 +84,22 @@ install/
     ...
 ```
 
-在当前项目的CMakeLists.txt中，设置变量SDL2_DIR为lib/cmake的路径，并自动查找包：
+In the current project's CMakeLists.txt, set the variable SDL2_DIR to the path of lib/cmake and automatically find the package:
 
 ```cmake
 set(SDL2_DIR "/path/to/install/lib/cmake")
 find_package(SDL2 REQUIRED)
 ```
 
-重新配置项目的CMake，若无报错，则说明配置成功。
+Reconfigure the project's CMake. If there are no errors, the configuration is successful.
 
-- 注意：在Windows下，需要手动将动态库文件SDL2.dll复制到项目可执行文件的生成目录，即和可执行文件在同一目录，否则运行时无法正确链接到动态库
+- Note: On Windows, you need to manually copy the dynamic library file SDL2.dll to the project executable's generation directory, i.e., in the same directory as the executable, otherwise the dynamic library cannot be correctly linked at runtime
 
-# SDL扩展库编译指南，以SDL_ttf为例
+# SDL Extension Library Compilation Guide, Using SDL_ttf as Example
 
-## 下载源代码
+## Download Source Code
 
-同SDL库，将下载好的源代码解压到相同的目录结构中：
+Same as the SDL library, extract the downloaded source code to the same directory structure:
 
 ```text
 SDL_ttf/
@@ -110,26 +110,26 @@ SDL_ttf/
         CMakeLists.txt
 ```
 
-## 配置CMake项目
+## Configure CMake Project
 
-由于SDL_ttf依赖于SDL，需要在配置时指定SDL库的路径，否则无法生成项目。ttf源代码中包含示例程序，编译这些示例程序需要链接到SDL.lib和SDLmain.lib。
+Since SDL_ttf depends on SDL, you need to specify the SDL library path during configuration, otherwise the project cannot be generated. The ttf source code contains sample programs, and compiling these sample programs requires linking to SDL.lib and SDLmain.lib.
 
 ### Windows
 
-配置：
+Configure:
 
 ```cmd
 cmake ../source -G "Visual Studio 17 2022" -DCMAKE_INSTALL_PREFIX=../install -DSDL2_DIR="" -DSDL2_LIBRARY="" -DSDL2_INCLUDE_DIR="" -DSDL2_MAIN_LIBRARY=""
 ```
 
-其中：
+Where:
 
-- SDL2_DIR为SDL的安装路径：/path/to/SDL/install
-- SDL2_LIBRARY为SDL.lib的路径：/path/to/SDL/install/lib/SDL2.lib
-- SDL2_INCLUDE_DIR为SDL头文件路径：/path/to/SDL/install/include/SDL2
-- SDL2_MAIN_LIBRARY为SDLmain.lib的路径：/path/to/SDL/install/lib/SDL2main.lib
+- SDL2_DIR is the SDL installation path: /path/to/SDL/install
+- SDL2_LIBRARY is the path to SDL.lib: /path/to/SDL/install/lib/SDL2.lib
+- SDL2_INCLUDE_DIR is the SDL header file path: /path/to/SDL/install/include/SDL2
+- SDL2_MAIN_LIBRARY is the path to SDLmain.lib: /path/to/SDL/install/lib/SDL2main.lib
 
-编译并安装：
+Compile and install:
 
 ```cmd
 cmake --build . --parallel --config Release
@@ -138,6 +138,6 @@ cmake --install . --config Release
 
 ### Linux
 
-## 在当前项目中使用安装文件
+## Using Installation Files in Current Project
 
-方法同SDL库，只是将SDL2_DIR换成SDL2_ttf_DIR；SDL2换成SDL2_ttf即可。
+Same method as the SDL library, just replace SDL2_DIR with SDL2_ttf_DIR; replace SDL2 with SDL2_ttf.

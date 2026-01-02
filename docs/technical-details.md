@@ -1,201 +1,201 @@
-# 技术细节
+# Technical Details
 
-## 架构概述
+## Architecture Overview
 
-RendererOptiX 采用分层架构设计，从底层到上层包括：OptiX 渲染层、图形 API 抽象层、渲染器接口层和应用层
+RendererOptiX adopts a layered architecture design, from bottom to top including: OptiX rendering layer, graphics API abstraction layer, renderer interface layer, and application layer.
 
-## OptiX 渲染管线
+## OptiX Rendering Pipeline
 
-### 上下文初始化
+### Context Initialization
 
-OptiX 设备上下文是渲染的核心，负责管理所有 OptiX 资源：
+The OptiX device context is the core of rendering, responsible for managing all OptiX resources:
 
 ```cpp
 OptixDeviceContext createContext(const std::string & cacheFilePath, bool isDebugMode)
 ```
 
-- 使用 CUDA 设备创建 OptiX 上下文
-- 配置缓存路径以加速着色器编译
-- 可选启用验证模式
+- Create OptiX context using CUDA device
+- Configure cache path to accelerate shader compilation
+- Optional validation mode
 
-## 加速结构
+## Acceleration Structures
 
-### 几何加速结构 (GAS)
+### Geometry Acceleration Structure (GAS)
 
-GAS 用于加速单个几何体类型的查询：
+GAS is used to accelerate queries for individual geometry types:
 
-- **球体 GAS**：使用内置球体求交器
-- **三角形 GAS**：使用内置三角形求交器
-- **粒子 GAS**：每个 VTK 粒子构建一个三角形 GAS
+- **Sphere GAS**: Uses built-in sphere intersector
+- **Triangle GAS**: Uses built-in triangle intersector
+- **Particle GAS**: Build one triangle GAS per VTK particle
 
-构建过程：
+Build process:
 
-1. 准备几何体数据（SOA 格式）
-2. 设置构建输入
-3. 计算所需内存
-4. 分配设备内存
-5. 构建加速结构
+1. Prepare geometry data (SOA format)
+2. Set up build input
+3. Calculate required memory
+4. Allocate device memory
+5. Build acceleration structure
 
-### 实例加速结构 (IAS)
+### Instance Acceleration Structure (IAS)
 
-IAS 将多个 GAS 组合成场景：
+IAS combines multiple GAS into a scene:
 
-- 每个 VTK 文件对应一个 IAS
-- IAS 包含额外几何体实例和所有粒子实例
-- 支持动态更新实例变换矩阵
+- One IAS per VTK file
+- IAS contains additional geometry instances and all particle instances
+- Supports dynamic update of instance transformation matrices
 
-## 着色器模块
+## Shader Modules
 
-### 模块创建
+### Module Creation
 
-项目使用三个 OptiX 模块：
+The project uses three OptiX modules:
 
-1. **自定义模块**：从 PTX 文件加载，包含用户定义的着色器
-2. **内置球体模块**：OptiX 内置球体求交器
-3. **内置三角形模块**：OptiX 内置三角形求交器
+1. **Custom Module**: Loaded from PTX file, contains user-defined shaders
+2. **Built-in Sphere Module**: OptiX built-in sphere intersector
+3. **Built-in Triangle Module**: OptiX built-in triangle intersector
 
-### 程序组
+### Program Groups
 
-创建六个程序组：
+Create six program groups:
 
-- `raygen`：光线生成程序
-- `miss`：未命中处理程序
-- `chSphereRough`：球体粗糙材质最近命中
-- `chSphereMetal`：球体金属材质最近命中
-- `chTriangleRough`：三角形粗糙材质最近命中
-- `chTriangleMetal`：三角形金属材质最近命中
+- `raygen`: Ray generation program
+- `miss`: Miss handler
+- `chSphereRough`: Sphere rough material closest hit
+- `chSphereMetal`: Sphere metal material closest hit
+- `chTriangleRough`: Triangle rough material closest hit
+- `chTriangleMetal`: Triangle metal material closest hit
 
-## 着色器绑定表 (SBT)
+## Shader Binding Table (SBT)
 
-SBT 将程序组与场景几何体关联：
+SBT associates program groups with scene geometry:
 
 ```text
-SBT 结构：
-├── RayGen 记录（1个）
-├── Miss 记录（1个）
-└── HitGroup 记录（N个）
-    ├── 额外球体记录
-    ├── 额外三角形记录
-    └── VTK 粒子记录（每个粒子一个）
+SBT Structure:
+├── RayGen Record (1)
+├── Miss Record (1)
+└── HitGroup Records (N)
+    ├── Additional sphere records
+    ├── Additional triangle records
+    └── VTK particle records (one per particle)
 ```
 
-每个记录包含：
+Each record contains:
 
-- 程序组句柄
-- 参数数据（材质索引、几何数据指针等）
+- Program group handle
+- Parameter data (material index, geometry data pointers, etc.)
 
-## 光线追踪流程
+## Ray Tracing Flow
 
-### RayGen 程序
+### RayGen Program
 
-1. 计算像素坐标对应的光线方向
-2. 初始化光线载荷（颜色、深度等）
-3. 调用 `optixTrace` 发射光线
-4. 处理返回结果
-5. 写入颜色缓冲区
+1. Calculate ray direction for pixel coordinates
+2. Initialize ray payload (color, depth, etc.)
+3. Call `optixTrace` to launch ray
+4. Process returned results
+5. Write to color buffer
 
-### ClosestHit程序
+### ClosestHit Program
 
-1. 读取几何体数据
-2. 计算交点法线
-3. 根据材质类型选择着色模型
-4. 递归发射反射/折射光线
-5. 返回着色结果
+1. Read geometry data
+2. Calculate intersection normal
+3. Select shading model based on material type
+4. Recursively launch reflection/refraction rays
+5. Return shading result
 
-### Miss程序
+### Miss Program
 
-返回背景颜色
+Return background color
 
-## 图像降噪
+## Image Denoising
 
-使用 OptiX AI Denoiser（一个基于卷积神经网络的降噪器）减少光线追踪噪点：
+Use OptiX AI Denoiser (a convolutional neural network-based denoiser) to reduce ray tracing noise:
 
-1. **输入缓冲区**：
-   - 颜色缓冲区（主输入）
-   - 法线缓冲区（引导）
-   - 反照率缓冲区（引导）
+1. **Input Buffers**:
+   - Color buffer (primary input)
+   - Normal buffer (guide)
+   - Albedo buffer (guide)
 
-2. **降噪过程**：
-   - 分配降噪器状态和临时缓冲区
-   - 调用 `optixDenoiserInvoke`
-   - 将结果复制到输出缓冲区
+2. **Denoising Process**:
+   - Allocate denoiser state and temporary buffers
+   - Call `optixDenoiserInvoke`
+   - Copy results to output buffer
 
-3. **输出**：降噪后的颜色缓冲区
+3. **Output**: Denoised color buffer
 
-## 内存管理
+## Memory Management
 
-### 数据结构
+### Data Structures
 
-#### SOA (Structure of Arrays) 布局
+#### SOA (Structure of Arrays) Layout
 
-几何体数据使用 SOA 格式存储，提高 GPU 访问效率：
+Geometry data is stored in SOA format to improve GPU access efficiency:
 
 ```cpp
-//球体数据
-float3 * dev_centers;  //所有球心连续存储
-float * dev_radii;     //所有半径连续存储
+// Sphere data
+float3 * dev_centers;  // All sphere centers stored contiguously
+float * dev_radii;     // All radii stored contiguously
 
-//三角形数据
-float3 * dev_vertices;  //所有顶点连续存储（3*count）
-float3 * dev_normals;   //所有法线连续存储（3*count）
+// Triangle data
+float3 * dev_vertices;  // All vertices stored contiguously (3*count)
+float3 * dev_normals;   // All normals stored contiguously (3*count)
 ```
 
-### 页面锁定内存
+### Pinned Memory
 
-实例数组使用页面锁定内存（Pinned Memory）：
+Instance arrays use pinned memory:
 
-- 加速 CPU-GPU 数据传输
-- 支持异步传输
-- 用于频繁更新的数据
+- Accelerates CPU-GPU data transfer
+- Supports asynchronous transfer
+- Used for frequently updated data
 
-### 内存分配策略
+### Memory Allocation Strategy
 
-1. **几何数据**：使用普通设备内存（`cudaMalloc`）
-2. **实例数组**：使用页面锁定内存（`cudaMallocHost`）
-3. **加速结构**：由 OptiX 管理
-4. **缓冲区**：使用 CUDA 数组（与图形 API 互操作）
+1. **Geometry Data**: Use regular device memory (`cudaMalloc`)
+2. **Instance Arrays**: Use pinned memory (`cudaMallocHost`)
+3. **Acceleration Structures**: Managed by OptiX
+4. **Buffers**: Use CUDA arrays (interop with graphics API)
 
-## 图形 API 集成
+## Graphics API Integration
 
-### CUDA-图形 API 互操作
+### CUDA-Graphics API Interop
 
-使用 CUDA 图形 API 互操作将 OptiX 渲染结果传递给图形 API，并使用SDL显示渲染结果：
+Use CUDA graphics API interop to pass OptiX rendering results to graphics API, and use SDL to display rendering results:
 
 #### OpenGL
 
-- 注册 OpenGL 纹理
-- 映射资源
-- 使用后解映射
+- Register OpenGL texture
+- Map resource
+- Unmap after use
 
 #### Vulkan
 
-使用 Vulkan 外部内存扩展：
+Use Vulkan external memory extension:
 
-- 创建支持外部内存的 Vulkan 图像
-- 获取内存句柄
-- 在 CUDA 中导入内存
+- Create Vulkan image supporting external memory
+- Get memory handle
+- Import memory in CUDA
 
 #### Direct3D
 
-使用 Direct3D 共享资源：
+Use Direct3D shared resources:
 
-- 创建共享纹理
-- 使用 `cudaGraphicsD3D11RegisterResource` 或 `cudaGraphicsD3D12RegisterResource`
-- 映射和解映射资源
+- Create shared texture
+- Use `cudaGraphicsD3D11RegisterResource` or `cudaGraphicsD3D12RegisterResource`
+- Map and unmap resources
 
-### 窗口管理
+### Window Management
 
-使用 SDL2 进行窗口和输入管理：
+Use SDL2 for window and input management:
 
-- 创建窗口和图形上下文
-- 处理键盘和鼠标输入
-- 管理事件循环
+- Create window and graphics context
+- Handle keyboard and mouse input
+- Manage event loop
 
-## VTK 数据处理
+## VTK Data Processing
 
-### 序列文件格式
+### Series File Format
 
-VTK 序列文件是 JSON 格式：
+VTK series files are in JSON format:
 
 ```json
 {
@@ -208,131 +208,131 @@ VTK 序列文件是 JSON 格式：
 }
 ```
 
-## 缓存系统
+## Cache System
 
-### 缓存文件格式
+### Cache File Format
 
-在Mesh模式下，每个 VTK 文件对应一个缓存文件：
+In Mesh mode, each VTK file corresponds to one cache file:
 
 ```text
 particleXX.cache:
-  [粒子总数: size_t]
-  粒子#0:
+  [Total particles: size_t]
+  Particle#0:
     [ID: size_t]
-    [速度: float3]
-    [顶点数: size_t]
-    [顶点数组: float3 * N]
-    [法线数组: float3 * N]
-  粒子#1:
+    [Velocity: float3]
+    [Vertex count: size_t]
+    [Vertex array: float3 * N]
+    [Normal array: float3 * N]
+  Particle#1:
     ...
 ```
 
-### 缓存优势
+### Cache Advantages
 
-- 避免重复解析 VTK 文件
-- 二进制格式，读取速度较快
-- 支持多线程并行加载
+- Avoid repeated VTK file parsing
+- Binary format, faster read speed
+- Support multi-threaded parallel loading
 
-### 数据转换
+### Data Conversion
 
-VTK 数据转换为渲染器内部格式：
+VTK data is converted to renderer internal format:
 
-1. **读取 VTK 文件**：使用 VTK 库解析
-2. **提取粒子数据**：获取每个粒子的 Cell 数据
-3. **转换为三角形**：将 Cell 转换为三角形网格
-4. **计算法线**：为每个三角形计算法线
-5. **存储到设备内存**：拷贝到 GPU
+1. **Read VTK File**: Parse using VTK library
+2. **Extract Particle Data**: Get Cell data for each particle
+3. **Convert to Triangles**: Convert Cell to triangle mesh
+4. **Calculate Normals**: Compute normals for each triangle
+5. **Store to Device Memory**: Copy to GPU
 
-## 材质系统
+## Material System
 
-### 材质类型
+### Material Types
 
-#### 粗糙材质 (Rough)
+#### Rough Material
 
-使用 Lambertian 漫反射模型：
+Uses Lambertian diffuse reflection model:
 
-- 反照率颜色决定漫反射颜色
-- 完全漫反射，无镜面反射
+- Albedo color determines diffuse color
+- Fully diffuse, no specular reflection
 
-#### 金属材质 (Metal)
+#### Metal Material
 
-使用 Cook-Torrance 微表面模型：
+Uses Cook-Torrance microfacet model:
 
-- 反照率颜色决定金属颜色
-- Fuzz 参数控制表面粗糙度
-- 支持镜面反射
+- Albedo color determines metal color
+- Fuzz parameter controls surface roughness
+- Supports specular reflection
 
-### 材质索引
+### Material Indexing
 
-材质数组组织：
+Material array organization:
 
 ```text
-[额外 Rough 材质] [额外 Metal 材质] [VTK Rough 材质] [VTK Metal 材质]
+[Additional Rough Materials] [Additional Metal Materials] [VTK Rough Materials] [VTK Metal Materials]
 ```
 
-VTK 粒子材质索引需要加上额外材质的偏移量。
+VTK particle material indices need to add offset for additional materials.
 
-## 性能优化
+## Performance Optimization
 
-### 加速结构优化
+### Acceleration Structure Optimization
 
-1. **GAS**：
-   - `OPTIX_BUILD_FLAG_ALLOW_COMPACTION`：压缩加速结构以节省显存
-   - `OPTIX_BUILD_FLAG_PREFER_FAST_TRACE`：优化追踪性能
+1. **GAS**:
+   - `OPTIX_BUILD_FLAG_ALLOW_COMPACTION`: Compact acceleration structure to save VRAM
+   - `OPTIX_BUILD_FLAG_PREFER_FAST_TRACE`: Optimize tracing performance
 
-2. **IAS**：
-   - `OPTIX_BUILD_FLAG_ALLOW_UPDATE`：允许增量更新
-   - 每个VTK文件仅构建一次，在帧之间更新IAS而非重建
+2. **IAS**:
+   - `OPTIX_BUILD_FLAG_ALLOW_UPDATE`: Allow incremental updates
+   - Build IAS only once per VTK file, update IAS between frames instead of rebuilding
 
-### 内存优化
+### Memory Optimization
 
-1. **数据布局**：使用 SOA 提高缓存效率
-2. **内存复用**：避免频繁分配释放
-3. **页面锁定内存**：使用页面锁定内存存放主机端实例数组，提升拷贝效率，并可使用CUDA流扩展为双缓冲
+1. **Data Layout**: Use SOA to improve cache efficiency
+2. **Memory Reuse**: Avoid frequent allocation/deallocation
+3. **Pinned Memory**: Use pinned memory for host-side instance arrays to improve copy efficiency, can be extended to double buffering with CUDA streams
 
-### 渲染优化
+### Rendering Optimization
 
-1. **降噪器**：通过降噪消除光线追踪的噪点。当前实现每像素采样1次
-2. **递归深度限制**：限制光线递归深度（当前为 5）
-3. **自适应采样**：可根据需要实现自适应采样
+1. **Denoiser**: Eliminate ray tracing noise through denoising. Current implementation samples 1 ray per pixel
+2. **Recursion Depth Limit**: Limit ray recursion depth (currently 5)
+3. **Adaptive Sampling**: Can implement adaptive sampling as needed
 
-## 调试支持
+## Debug Support
 
-### OptiX 验证模式
+### OptiX Validation Mode
 
-启用验证模式可以检测：
+Enabling validation mode can detect:
 
-- 无效的加速结构
-- 着色器参数错误
-- 内存访问越界
+- Invalid acceleration structures
+- Shader parameter errors
+- Memory access violations
 
-### 图形 API 调试
+### Graphics API Debugging
 
-- OpenGL：使用 `glDebugMessageCallback`
-- Vulkan：启用验证层
-- Direct3D：使用调试设备
+- OpenGL: Use `glDebugMessageCallback`
+- Vulkan: Enable validation layers
+- Direct3D: Use debug device
 
-启用调试模式后，控制台中会打印调试信息
+When debug mode is enabled, debug information is printed to console
 
-### 日志系统
+### Logging System
 
-使用 SDL 日志系统输出渲染器信息，包括：
+Use SDL logging system to output renderer information, including:
 
-- 配置解析
-- 数据加载进度
-- 错误信息
+- Configuration parsing
+- Data loading progress
+- Error messages
 
-## 限制
+## Limitations
 
-1. **单 GPU**：不支持多 GPU 渲染
-2. **材质模型简化**：使用简化的物理材质模型
-3. **无体积渲染**：不支持体积数据渲染
+1. **Single GPU**: Multi-GPU rendering not supported
+2. **Simplified Material Model**: Uses simplified physically-based material models
+3. **No Volume Rendering**: Volume data rendering not supported
 
-## 未来改进方向
+## Future Improvement Directions
 
-1. **更复杂的材质**：实现更多物理材质模型和光源
-2. **重要性采样**：对光源进行重要性采样，提升图像质量
-3. **体积渲染**：支持体积数据的光线追踪
-4. **多GPU支持**：分布式渲染，分块渲染
-5. **对象选择**：渲染中支持选中粒子，查看其实时信息
-6. **实时编辑**：3D编辑器，支持运行时修改场景
+1. **More Complex Materials**: Implement more physically-based material models and light sources
+2. **Importance Sampling**: Importance sampling for light sources to improve image quality
+3. **Volume Rendering**: Support ray tracing for volume data
+4. **Multi-GPU Support**: Distributed rendering, tile-based rendering
+5. **Object Selection**: Support particle selection in rendering to view real-time information
+6. **Real-time Editing**: 3D editor supporting runtime scene modification

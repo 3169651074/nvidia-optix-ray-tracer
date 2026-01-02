@@ -1,182 +1,187 @@
-# 项目介绍
+# Project Introduction
 
-## 概述
+## Overview
 
-RendererOptiX 是一个基于 NVIDIA OptiX 9.0 实现的高性能实时渲染器，专门用于渲染 VTK（Visualization Toolkit）特定格式的粒子数据。该项目结合了现代光线追踪技术和多种图形 API，提供了一个灵活且高效的渲染解决方案。
+RendererOptiX is a high-performance real-time renderer based on NVIDIA OptiX 9.0, specifically designed for rendering VTK (Visualization Toolkit) format particle data. This project combines modern ray tracing technology with multiple graphics APIs to provide a flexible and efficient rendering solution.
 
-## 项目目标
+## Project Goals
 
-- **高性能渲染**：利用 GPU 光线追踪技术实现实时渲染
-- **易用性**：通过 JSON 配置文件统一渲染参数设置
-- **跨平台支持**：支持 Windows 和 Linux 平台
-- **多 API 兼容**：支持使用 OpenGL、Vulkan、Direct3D11、Direct3D12 显示渲染画面
-- **可扩展性**：模块化设计，便于扩展新功能
+- **High-Performance Rendering**: Achieve real-time rendering using GPU ray tracing technology
+- **Ease of Use**: Unified rendering parameter configuration through JSON files
+- **Cross-Platform Support**: Support for Windows and Linux platforms
+- **Multi-API Compatibility**: Support for displaying rendered images using OpenGL, Vulkan, Direct3D11, and Direct3D12
+- **Extensibility**: Modular design for easy extension of new features
 
-## 核心特性
+## Core Features
 
-### 1. OptiX 光线追踪
+### 1. OptiX Ray Tracing
 
-项目使用 NVIDIA OptiX 9.0 作为核心渲染引擎，实现了：
+The project uses NVIDIA OptiX 9.0 as the core rendering engine, implementing:
 
-- 实时光线追踪
-- 多种几何体支持（球体、三角形、VTK 粒子）
-- 材质系统（粗糙材质和金属材质）
-- 降噪处理，集成了OptiX AI Denoiser
+- Real-time ray tracing
+- Multiple geometry types support (spheres, triangles, VTK particles)
+- Material system (rough materials and metallic materials)
+- Denoising processing with integrated OptiX AI Denoiser
 
-### 2. VTK 数据支持
+### 2. VTK Data Support
 
-- 支持读取 VTK 序列文件（`.vtk.series`）
-- 自动解析粒子几何数据
-- 支持粒子缓存以加速加载
-- 使用多线程读写缓存文件
+- Support for reading VTK series files (`.vtk.series`)
+- Automatic parsing of particle geometry data
+- Support for particle caching to accelerate loading
+- Multi-threaded cache file reading and writing
 
-### 3. 图形 API
+### 3. Graphics APIs
 
-项目实现了现代图形 API 和CUDA的互操作，支持：
+The project implements interoperability between modern graphics APIs and CUDA, supporting:
 
-- **OpenGL**：跨平台标准图形 API
-- **Vulkan**：现代低级别图形 API
-- **Direct3D11**：Windows 平台（仅 Windows）
-- **Direct3D12**：Windows 平台现代 API（仅 Windows）
+- **OpenGL**: Cross-platform standard graphics API
+- **Vulkan**: Modern low-level graphics API
+- **Direct3D11**: Windows platform (Windows only)
+- **Direct3D12**: Windows platform modern API (Windows only)
 
-### 4. 交互式控制
+### 4. Interactive Controls
 
-- 鼠标控制相机旋转
-- 键盘控制相机移动（WASD移动 + Space/Left Shift上升下降）
-- 滚轮调节移动速度（向上滚动加速移动）
-- 单击鼠标左键释放鼠标自由移动，再次单击可回到窗口中
-- 可配置的相机参数
+- Mouse control for camera rotation
+- Keyboard control for camera movement (WASD movement + Space/Left Shift for up/down)
+- Mouse wheel to adjust movement speed (scroll up to accelerate movement)
+- Left-click to release mouse for free movement, click again to return to window
+- Configurable camera parameters
 
-## 架构设计
+## Architecture Design
 
-### 整体架构
+### Overall Architecture
 
 ```text
 ┌─────────────────────────────────────────┐
-         应用程序入口 (Main.cu)
+│     Application Entry (Main.cu)        │
 └──────────────┬──────────────────────────┘
                │
 ┌──────────────▼──────────────────────────┐
-  渲染器接口层 (RendererTime/RendererMesh)
-  - 数据提交和初始化
-  - 渲染循环控制
-  - 资源管理
+│  Renderer Interface Layer               │
+│  (RendererTime/RendererMesh)           │
+│  - Data submission and initialization   │
+│  - Render loop control                  │
+│  - Resource management                  │
 └──────────────┬──────────────────────────┘
                │
 ┌──────────────▼──────────────────────────┐
-     渲染器实现层 (RendererImpl.cuh)
-  - OptiX 上下文管理
-  - 加速结构构建 (GAS/IAS)
-  - 着色器绑定表 (SBT)
-  - 降噪器管理
+│     Renderer Implementation Layer       │
+│     (RendererImpl.cuh)                 │
+│  - OptiX context management            │
+│  - Acceleration structure building      │
+│    (GAS/IAS)                           │
+│  - Shader Binding Table (SBT)          │
+│  - Denoiser management                 │
 └──────────────┬──────────────────────────┘
                │
 ┌──────────────▼──────────────────────────┐
-     图形 API 层 (SDL_GraphicsWindow)
-  - 窗口管理
-  - 图形资源管理
-  - CUDA-SDL-图形 API 互操作
+│     Graphics API Layer                  │
+│     (SDL_GraphicsWindow)               │
+│  - Window management                   │
+│  - Graphics resource management        │
+│  - CUDA-SDL-Graphics API interop       │
 └──────────────┬──────────────────────────┘
                │
 ┌──────────────▼──────────────────────────┐
-     工具层 (Util)
-  - VTK 文件读取
-  - JSON 配置解析
-  - 颜色映射和粒子材质生成
+│     Utility Layer (Util)               │
+│  - VTK file reading                    │
+│  - JSON configuration parsing          │
+│  - Color mapping and particle material │
+│    generation                          │
 └─────────────────────────────────────────┘
 ```
 
-### 核心模块
+### Core Modules
 
-#### 1. 渲染器核心 (Renderer)
+#### 1. Renderer Core (Renderer)
 
-`Renderer` 类提供了渲染器的主要接口：
+The `Renderer` class provides the main interface for the renderer:
 
-- `commitRendererData()`：提交几何体和材质数据，初始化渲染器
-- `startRender()`：启动渲染循环
-- `freeRendererData()`：释放渲染资源
+- `commitRendererData()`: Submit geometry and material data, initialize renderer
+- `startRender()`: Start render loop
+- `freeRendererData()`: Free rendering resources
 
-#### 2. OptiX 实现 (RendererImpl)
+#### 2. OptiX Implementation (RendererImpl)
 
-实现了 OptiX 相关的底层操作：
+Implements OptiX-related low-level operations:
 
-- **上下文管理**：创建和销毁 OptiX 设备上下文
-- **加速结构**：构建几何加速结构（GAS）和实例加速结构（IAS）
-- **着色器模块**：加载和编译 PTX 着色器
-- **程序组**：创建光线生成、未命中、最近命中程序组
-- **降噪器**：初始化和管理 OptiX 降噪器
+- **Context Management**: Create and destroy OptiX device context
+- **Acceleration Structures**: Build Geometry Acceleration Structure (GAS) and Instance Acceleration Structure (IAS)
+- **Shader Modules**: Load and compile PTX shaders
+- **Program Groups**: Create ray generation, miss, and closest hit program groups
+- **Denoiser**: Initialize and manage OptiX denoiser
 
-#### 3. 图形 API 封装
+#### 3. Graphics API Wrapper
 
-`SDL_GraphicsWindow` 提供了统一的图形 API 接口：
+`SDL_GraphicsWindow` provides a unified graphics API interface:
 
-- 窗口创建和管理
-- 图形资源（纹理、缓冲区）管理
-- CUDA 与图形 API 的互操作
-- 输入事件处理
+- Window creation and management
+- Graphics resource (textures, buffers) management
+- CUDA and graphics API interoperability
+- Input event handling
 
-#### 4. VTK 读取器 (VTKReader)
+#### 4. VTK Reader (VTKReader)
 
-负责读取和处理 VTK 数据：
+Responsible for reading and processing VTK data:
 
-- 解析 VTK 序列文件
-- 读取粒子几何数据
-- 缓存管理（读写缓存文件）
-- 多线程数据加载
+- Parse VTK series files
+- Read particle geometry data
+- Cache management (read/write cache files)
+- Multi-threaded data loading
 
-## 数据流
+## Data Flow
 
-### 渲染流程
+### Rendering Pipeline
 
-1. **初始化阶段**
-   - 解析 JSON 配置文件
-   - 读取 VTK 数据或加载缓存
-   - 构建几何体和材质数据
-   - 初始化 OptiX 上下文和管线
+1. **Initialization Phase**
+   - Parse JSON configuration file
+   - Read VTK data or load cache
+   - Build geometry and material data
+   - Initialize OptiX context and pipeline
 
-2. **每帧渲染**
-   - 更新相机参数
-   - 更新实例变换矩阵
-   - 执行 OptiX 光线追踪
-   - 应用降噪处理
-   - 将结果复制到图形 API 资源
-   - 呈现到屏幕
+2. **Per-Frame Rendering**
+   - Update camera parameters
+   - Update instance transformation matrices
+   - Execute OptiX ray tracing
+   - Apply denoising
+   - Copy results to graphics API resources
+   - Present to screen
 
-3. **清理阶段**
-   - 释放设备内存
-   - 销毁加速结构
-   - 关闭 OptiX 上下文
-   - 销毁图形 API 资源
+3. **Cleanup Phase**
+   - Free device memory
+   - Destroy acceleration structures
+   - Close OptiX context
+   - Destroy graphics API resources
 
-### 内存管理
+### Memory Management
 
-- **主机内存**：存储配置数据和元数据
-- **设备内存**：存储几何数据、材质数据、加速结构
-- **页面锁定内存**：用于实例数组，加速 CPU-GPU 传输
-- **CUDA 数组**：用于与图形 API 共享渲染结果
+- **Host Memory**: Store configuration data and metadata
+- **Device Memory**: Store geometry data, material data, acceleration structures
+- **Pinned Memory**: Used for instance arrays, accelerating CPU-GPU transfers
+- **CUDA Arrays**: Used for sharing rendering results with graphics APIs
 
-## 技术栈
+## Technology Stack
 
-- **CUDA**：GPU 计算和内存管理
-- **OptiX 9.0**：光线追踪引擎
-- **VTK 9.5**：VTK 文件读取
-- **SDL2**：窗口和输入管理
-- **Vulkan/DirectX/OpenGL**：图形渲染后端
-- **nlohmann/json**：JSON 配置解析
-- **CMake**：构建系统
+- **CUDA**: GPU computation and memory management
+- **OptiX 9.0**: Ray tracing engine
+- **VTK 9.5**: VTK file reading
+- **SDL2**: Window and input management
+- **Vulkan/DirectX/OpenGL**: Graphics rendering backends
+- **nlohmann/json**: JSON configuration parsing
+- **CMake**: Build system
 
-## 应用场景
+## Application Scenarios
 
-- **科学可视化**：渲染大规模粒子数据
-- **数据探索**：交互式查看 VTK 数据集
-- **渲染研究**：光线追踪技术学习和实验
-- **性能测试**：GPU 光线追踪性能评估
+- **Scientific Visualization**: Render large-scale particle data
+- **Data Exploration**: Interactively view VTK datasets
+- **Rendering Research**: Learn and experiment with ray tracing technology
+- **Performance Testing**: GPU ray tracing performance evaluation
 
-## 未来规划
+## Future Plans
 
-- 支持更多几何体类型
-- 实现更复杂的材质模型
-- 添加体积渲染支持
-- 优化大规模场景渲染性能
-- 支持多 GPU 渲染
-- 添加后处理效果
+- Support for more geometry types
+- Implement more complex material models
+- Add volume rendering support
+- Optimize large-scale scene rendering performance
+- Support multi-GPU rendering
+- Add post-processing effects

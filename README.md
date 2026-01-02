@@ -1,35 +1,37 @@
+[简体中文](./README_CN.md)
+
 # RendererOptiX
 
-一个基于 NVIDIA OptiX 实现的 VTK 渲染器，支持实时渲染特定格式的 VTK 粒子数据，并支持使用OpenGL、Vulkan、Direct3D（Windows）呈现画面。
+A VTK renderer based on NVIDIA OptiX that supports real-time rendering of VTK particle data in specific formats, with support for OpenGL, Vulkan, and Direct3D (Windows) rendering.
 
-## 项目简介
+## Project Introduction
 
-RendererOptiX 是一个高性能实时渲染器，使用 NVIDIA OptiX 9.0 进行光线追踪渲染。该项目能够读取和渲染特定 VTK 格式的粒子数据，并生成缓存文件。支持粗糙材质和金属材质类型，提供键鼠交互式控制。
+RendererOptiX is a high-performance real-time renderer that uses NVIDIA OptiX 9.0 for ray tracing rendering. This project can read and render particle data in specific VTK formats and generate cache files. It supports rough and metal material types, and provides interactive keyboard and mouse controls.
 
-**本项目作为使用OptiX实现的较为基础的项目，可以作为NVIDIA OptiX库的入门示例，为GPU光线追踪器和OptiX API学习者提供参考。**
+**This project serves as a relatively basic implementation using OptiX and can be used as an introductory example for the NVIDIA OptiX library, providing reference for GPU ray tracer and OptiX API learners.**
 
-**仓库文件中在files文件夹中提供了一组VTK粒子示例，可以使用这些示例来验证渲染器工作**
+**A set of VTK particle examples is provided in the files folder in the repository, which can be used to verify the renderer's functionality**
 
-## 功能特性
+## Features
 
-- **高性能光线追踪**：基于 NVIDIA OptiX 9.0 实现
-- **VTK 数据支持**：支持读取和渲染特定格式的 VTK 粒子序列文件
-- **多种材质**：支持粗糙材质（Rough）和金属材质（Metal）
-- **多图形 API**：支持 OpenGL、Vulkan、Direct3D11、Direct3D12
-- **交互式控制**：支持鼠标和键盘控制相机
-- **缓存系统**：支持 VTK 数据缓存以加速加载
-- **可配置渲染**：通过 JSON 配置文件灵活配置渲染参数
+- **High-performance ray tracing**: Based on NVIDIA OptiX 9.0
+- **VTK data support**: Supports reading and rendering VTK particle sequence files in specific formats
+- **Multiple materials**: Supports rough and metal materials
+- **Multiple graphics APIs**: Supports OpenGL, Vulkan, Direct3D11, Direct3D12
+- **Interactive controls**: Supports mouse and keyboard camera controls
+- **Cache system**: Supports VTK data caching to accelerate loading
+- **Configurable rendering**: Flexible rendering parameter configuration via JSON configuration files
 
-## 文档索引
+## Documentation Index
 
-- [项目介绍](docs/project-introduction.md) - 项目概述、架构设计和核心概念
-- [构建指南](docs/build-guide.md) - 编译环境要求、构建步骤和依赖配置
-- [配置参考](docs/configuration.md) - 配置文件格式和参数说明
-- [使用指南](docs/usage.md) - 配置说明和使用示例
-- [技术细节](docs/technical-details.md) - 技术架构、实现原理和性能优化
+- [Project Introduction](docs/project-introduction.md) - Project overview, architecture design, and core concepts
+- [Build Guide](docs/build-guide.md) - Build environment requirements, build steps, and dependency configuration
+- [Configuration Reference](docs/configuration.md) - Configuration file format and parameter descriptions
+- [Usage Guide](docs/usage.md) - Configuration instructions and usage examples
+- [Technical Details](docs/technical-details.md) - Technical architecture, implementation principles, and performance optimization
 
-## 注意事项
+## Notes
 
-- 由于此渲染器依赖库体积较大，且所依赖的VTK库，官方不提供预编译版本，因此本项目仓库文件中不包含依赖库的文件。在运行渲染器之前，需要满足所有依赖库并从源码编译本项目。
+- Since this renderer relies on libraries with large file sizes, and the VTK library it depends on does not provide precompiled versions officially, the project repository does not include dependency library files. Before running the renderer, all dependency libraries must be satisfied and the project must be compiled from source.
 
-- 在满足重新生成的要求时，需要重新编译着色器PTX文件或重新生成缓存，否则渲染器无法正常工作，具体要求请参见文档对应部分。
+- When regeneration requirements are met, shader PTX files need to be recompiled or caches need to be regenerated, otherwise the renderer will not work properly. Please refer to the corresponding sections in the documentation for specific requirements.

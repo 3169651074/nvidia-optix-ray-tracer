@@ -1,91 +1,91 @@
-# 构建指南
+# Build Guide
 
-## 系统要求
+## System Requirements
 
-### 硬件要求
+### Hardware Requirements
 
-- **GPU**：NVIDIA GPU，Turing架构及以上（拥有RT Core），支持CUDA 和OptiX。
-  - 最低：CUDA Compute Capability 7.5+（sm_75）
-  - 推荐：GeForce RTX 30 系列或更高
-  - Game Ready / Studio 驱动均可
-- **内存**：至少8GB RAM（推荐16GB或更多，取决于缓存读写线程数）
-- **显存**：至少8GB（推荐12GB或更多，取决于VTK粒子规模）
+- **GPU**: NVIDIA GPU, Turing architecture or above (with RT Cores), supporting CUDA and OptiX.
+  - Minimum: CUDA Compute Capability 7.5+ (sm_75)
+  - Recommended: GeForce RTX 30 series or higher
+  - Both Game Ready and Studio drivers are supported
+- **Memory**: At least 8GB RAM (16GB or more recommended, depending on the number of cache read/write threads)
+- **VRAM**: At least 8GB (12GB or more recommended, depending on VTK particle scale)
 
-### 软件要求
+### Software Requirements
 
-- **[CMake](https://cmake.org)**：4.0或更高版本
-- **[CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit)**：12.0+
-- **[OptiX SDK](https://developer.nvidia.com/rtx/ray-tracing/optix)**：9.0.0+
-- **[Vulkan SDK](https://www.vulkan.org/)**: 1.1及以上
+- **[CMake](https://cmake.org)**: 4.0 or higher
+- **[CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit)**: 12.0+
+- **[OptiX SDK](https://developer.nvidia.com/rtx/ray-tracing/optix)**: 9.0.0+
+- **[Vulkan SDK](https://www.vulkan.org/)**: 1.1 and above
 
 #### Windows
 
-- **操作系统**：Windows 10/11
-- **编译器**：[Visual Studio 2022 / 2026](https://visualstudio.microsoft.com)（支持 C++20），并安装“使用C++的桌面开发”模块
+- **Operating System**: Windows 10/11
+- **Compiler**: [Visual Studio 2022 / 2026](https://visualstudio.microsoft.com) (supporting C++20), with "Desktop development with C++" workload installed
 
 #### Linux
 
-- **操作系统**：Ubuntu 22.04/24.04+ 或其他发行版
-- **编译器**：GCC 10+ 或 Clang 12+（支持 C++20）
+- **Operating System**: Ubuntu 22.04/24.04+ or other distributions
+- **Compiler**: GCC 10+ or Clang 12+ (supporting C++20)
 
 ```bash
 sudo apt update && sudo apt install gcc g++ make
-#可以使用 gcc -v 查看版本号
+# You can check the version with gcc -v
 ```
 
-- **系统包管理器的CMake通常不是最新版本，通常情况下为3.2.x**。要安装最新版本，Ubuntu系统可以使用自带的App Center，选择最新版进行安装。其他发行版也可以[添加CMake仓库](install-latest-camke.md)后使用包管理器安装，亦或是前往[官网](https://cmake.org/download)手动下载预编译包或源码。
+- **CMake from system package managers is usually not the latest version, typically 3.2.x**. To install the latest version, Ubuntu users can use the built-in App Center and select the latest version for installation. Other distributions can also [add the CMake repository](install-latest-camke.md) and then install via package manager, or manually download precompiled packages or source code from the [official website](https://cmake.org/download).
 
 ```bash
 sudo apt install cmake cmake-qt-gui
 ```
 
-- 此文档为Debian系发行版提供构建指南，源代码在Ubuntu 24.04上已验证可编译运行。若使用其他发行版，需要使用发行版对应的系统命令。若切换到其他发行版后遇到报错，可能需要修改部分源代码。
-- 本项目的所有代码以跨平台为编写原则，除少量图形API调用代码外，没有平台特定代码。
+- This document provides build instructions for Debian-based distributions. The source code has been verified to compile and run on Ubuntu 24.04. If using other distributions, you need to use the corresponding system commands for that distribution. If you encounter errors after switching to other distributions, you may need to modify parts of the source code.
+- All code in this project is written with cross-platform principles in mind. Except for a small amount of graphics API call code, there is no platform-specific code.
 
-## 依赖库安装
+## Dependency Installation
 
-- 安装前确保将显卡驱动更新到最新版。
+- Before installation, ensure your graphics driver is updated to the latest version.
 
 ### CUDA Toolkit
 
-1. 从[NVIDIA官网](https://developer.nvidia.com/cuda-downloads)下载并安装 CUDA Toolkit
-2. 确保 `nvcc.exe`/`nvcc` 在系统 PATH 中
+1. Download and install CUDA Toolkit from [NVIDIA official website](https://developer.nvidia.com/cuda-downloads)
+2. Ensure `nvcc.exe`/`nvcc` is in the system PATH
 
 #### Windows
 
-直接运行安装程序进行安装即可，建议安装到默认目录。
+Simply run the installer. It is recommended to install to the default directory.
 
 #### Linux
 
-建议使用“deb(local)”方式进行安装。
+It is recommended to use the "deb(local)" method for installation.
 
 ### OptiX SDK
 
-从[NVIDIA官网](https://developer.nvidia.com/designworks/optix/download)下载 OptiX SDK 9.0.0。
+Download OptiX SDK 9.0.0 from [NVIDIA official website](https://developer.nvidia.com/designworks/optix/download).
 
 #### Windows
 
-直接运行安装程序，建议安装到默认目录。
+Simply run the installer. It is recommended to install to the default directory.
 
 #### Linux
 
-建议解压到无需sudo即可读写的用户目录，例如：  
+It is recommended to extract to a user directory that can be read and written without sudo, for example:  
 `~/Public/NVIDIA-OptiX-SDK-9.0.0-linux64-x86_64`
 
 ### SDL2
 
 #### Windows
 
-1. 从[SDL2的GitHub仓库](https://github.com/libsdl-org/SDL)下载源代码手动编译或下载 “devel-...-VC” 的预编译版本
+1. Download the source code from [SDL2's GitHub repository](https://github.com/libsdl-org/SDL) and compile manually, or download the precompiled "devel-...-VC" version
 
-- 若使用SDL3，则需要修改include/Global/HostFunctions.cuh中的SDL头文件包含。
-- 若从源代码编译，可以参考[SDL编译指南](compile-sdl.md)。
+- If using SDL3, you need to modify the SDL header file inclusion in include/Global/HostFunctions.cuh.
+- If compiling from source code, you can refer to the [SDL Build Guide](compile-sdl.md).
 
-2. 解压下载的预编译包或提取手动编译得到SDL安装文件夹
+2. Extract the downloaded precompiled package or extract the SDL installation folder obtained from manual compilation
 
 #### Linux
 
-可以从源代码编译，但推荐直接使用系统包管理器安装：
+You can compile from source code, but it is recommended to install directly using the system package manager:
 
 ```bash
 sudo apt install libsdl2-dev
@@ -93,69 +93,69 @@ sudo apt install libsdl2-dev
 
 ### Vulkan SDK
 
-1. 从[Vulkan官网](https://vulkan.lunarg.com/)下载并安装 Vulkan SDK
-2. 确保环境变量正确设置
+1. Download and install Vulkan SDK from [Vulkan official website](https://vulkan.lunarg.com/)
+2. Ensure environment variables are correctly set
 
 #### Windows
 
-建议保持默认安装位置。安装完成后可以从开始菜单中找到Vulkan Cude示例并运行，若正常运行则表示配置成功。
+It is recommended to keep the default installation location. After installation, you can find and run the Vulkan Cube example from the Start menu. If it runs normally, the configuration is successful.
 
 #### Linux
 
-请下载tarball版本的SDK，解压后得到Vulkan安装文件夹。
+Please download the tarball version of the SDK, and extract it to get the Vulkan installation folder.
 
 ### VTK
 
-1. 从[VTK官网](https://vtk.org/download)下载源代码
-2. 可以参考[VTK编译指南](compile-vtk.md)进行编译
-3. 提取手动编译得到的VTK安装文件夹
+1. Download source code from [VTK official website](https://vtk.org/download)
+2. You can refer to the [VTK Build Guide](compile-vtk.md) for compilation
+3. Extract the VTK installation folder obtained from manual compilation
 
-## 编译
+## Building
 
-以下介绍使用CMake GUI的方式。也可以直接使用命令行或修改CMakeLists.txt开头的默认路径。
+The following introduces the method using CMake GUI. You can also directly use the command line or modify the default paths at the beginning of CMakeLists.txt.
 
-- 如果生成过CMake项目，在修改CMakeLists.txt后，需要删除生成的文件并重新配置。
+- If you have generated a CMake project before, after modifying CMakeLists.txt, you need to delete the generated files and reconfigure.
 
-- Configure时，若报错找不到库，则修改库路径为正确的路径后，无需删除缓存，直接再次点击Configure即可。
+- When configuring, if an error occurs indicating a library cannot be found, modify the library path to the correct path, and you can directly click Configure again without deleting the cache.
 
 ### Windows
 
-- 生成.sln解决方案文件：
+- Generate .sln solution file:
 
-1. 打开CMake GUI，设置源代码目录为项目根目录（包含CMakeLists.txt）
-2. 设置构建目录，可以在任意其他位置新建一个文件夹，或在项目根目录新建build文件夹
-3. 无需修改CMAKE_INSTALL_PREFIX，不会使用这个变量
-4. 点击Configure，生成器选择`Visual Studio 17 2022`，其他设置保持不变
-5. 等待读取完成，设置所有依赖库的路径，注意SDL和VTK的路径需要分别指定到`install/cmake/`和`install/lib/cmake/vtk-x.x`
-6. 点击Generate生成CMake项目
-7. 点击Open Project在Visual Studio中打开项目，在“解决方案资源管理器”中找到“RendererOptiX”项目，右键“生成”，开始编译。
-8. 回到源代码目录bin/文件夹，将bin/Release文件夹下的可执行文件和两个库文件移动到bin目录下
-9. 确认SDL和VTK的动态库已经正确拷贝到bin目录下
-10. 开启`cache=true`，开始生成缓存文件并进行后续渲染
+1. Open CMake GUI, set the source code directory to the project root directory (containing CMakeLists.txt)
+2. Set the build directory. You can create a new folder at any other location, or create a build folder in the project root directory
+3. No need to modify CMAKE_INSTALL_PREFIX, this variable will not be used
+4. Click Configure, select `Visual Studio 17 2022` as the generator, keep other settings unchanged
+5. Wait for reading to complete, set the paths for all dependencies. Note that the paths for SDL and VTK need to be specified to `install/cmake/` and `install/lib/cmake/vtk-x.x` respectively
+6. Click Generate to generate the CMake project
+7. Click Open Project to open the project in Visual Studio. In "Solution Explorer", find the "RendererOptiX" project, right-click and select "Build" to start compilation
+8. Return to the source code directory bin/ folder, move the executable file and two library files from the bin/Release folder to the bin directory
+9. Confirm that the SDL and VTK dynamic libraries have been correctly copied to the bin directory
+10. Enable `cache=true` to start generating cache files and proceed with subsequent rendering
 
-- 生成CMake配置文件，项目不依赖于Visual Studio .sln
-- 可以使用CLion IDE进行编译
+- Generate CMake configuration files, the project does not depend on Visual Studio .sln
+- You can use CLion IDE for compilation
 
 ### Linux
 
-1. 打开CMake GUI，设置源代码目录为项目根目录（包含CMakeLists.txt）
-2. 设置构建目录，可以在任意其他位置新建一个文件夹，或在项目根目录新建build文件夹
-3. 无需修改CMAKE_INSTALL_PREFIX，不会使用这个变量
-4. 点击Configure，生成器选择`Unix Makefiles`，其他设置保持不变
-5. 等待读取完成，设置所有依赖库的路径
-6. 点击Generate生成CMake项目
-7. 关闭GUI，在当前位置打开命令行，输入编译命令
+1. Open CMake GUI, set the source code directory to the project root directory (containing CMakeLists.txt)
+2. Set the build directory. You can create a new folder at any other location, or create a build folder in the project root directory
+3. No need to modify CMAKE_INSTALL_PREFIX, this variable will not be used
+4. Click Configure, select `Unix Makefiles` as the generator, keep other settings unchanged
+5. Wait for reading to complete, set the paths for all dependencies
+6. Click Generate to generate the CMake project
+7. Close the GUI, open the command line at the current location, and enter the build command
 
 ```bash
 cmake --build . --parallel
 ```
 
-- 也可以使用其他IDE如CLion进行编译。若使用CLion，在Windows下需选择使用Visual Studio工具链架构设置为x86_amd64。若不可用，则选择amd64架构；Linux下使用默认工具链即可。
+- You can also use other IDEs such as CLion for compilation. If using CLion, on Windows you need to select the Visual Studio toolchain architecture set to x86_amd64. If unavailable, select the amd64 architecture; on Linux, use the default toolchain.
 
-## 下一步
+## Next Steps
 
-构建成功后，请参考：
+After successful build, please refer to:
 
-- [配置参考](configuration.md) - 了解配置选项
-- [使用指南](usage.md) - 使用程序
-- [技术细节](technical-details.md) - 深入了解实现
+- [Configuration Reference](configuration.md) - Learn about configuration options
+- [Usage Guide](usage.md) - Using the program
+- [Technical Details](technical-details.md) - Deep dive into implementation

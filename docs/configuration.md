@@ -1,71 +1,71 @@
-# 配置参考
+# Configuration Reference
 
-本文档详细说明 `config.json` 配置文件的所有参数
+This document details all parameters of the `config.json` configuration file.
 
-## 配置文件位置
+## Configuration File Location
 
-默认配置文件路径：`files/config.json`
+Default configuration file path: `files/config.json`
 
-可以在 `include/Util/ProgramArgumentParser.cuh` 中修改 `CONFIG_FILE_PATH` 常量来更改路径。
+You can modify the `CONFIG_FILE_PATH` constant in `include/Util/ProgramArgumentParser.cuh` to change the path.
 
-## 文件路径配置
+## File Path Configuration
 
 ```json
-//是否为mesh输入：当每个VTK文件都包含完整的粒子几何时为mesh输入
+// Whether this is mesh input: true when each VTK file contains complete particle geometry
 "mesh": false,
-//.vtk.series文件路径
+// .vtk.series file path
 "series-path": "../files/",
-//.vtk.series文件名
+// .vtk.series file name
 "series-name": "particle.vtk.series",
-//生成的缓存文件存放路径（OptiX缓存和mesh模式下数据缓存）
+// Path for generated cache files (OptiX cache and data cache in mesh mode)
 "cache-path": "../cache/",
-//非mesh输入时，STL文件的路径
+// Path to STL files for non-mesh input
 "stl-path": "../files/shape/separated/",
 ```
 
-**注意**：
+**Note**:
 
-- 路径可以是相对路径（相对于可执行文件）或绝对路径
-- Linux下，如果使用MangoHud进行OSD显示，此时可执行文件路径改变，需要使用绝对路径
-- 路径分隔符使用 `/`（Windows 和 Linux 都支持）
+- Paths can be relative (to the executable) or absolute
+- On Linux, if using MangoHud for OSD display, the executable path changes and absolute paths should be used
+- Use `/` as path separator (supported on both Windows and Linux)
 
-## 缓存配置
+## Cache Configuration
 
 ```json
-//是否生成缓存文件并退出程序
-//true：程序启动后读取VTK文件，生成缓存文件，然后退出
-//false：读取已生成的缓存文件并启动渲染
+// Whether to generate cache files and exit the program
+// true: Program reads VTK files on startup, generates cache files, then exits
+// false: Reads already generated cache files and starts rendering
 "cache": false
-//读写缓存文件时使用的CPU线程数，根据实际CPU型号设定
+// Number of CPU threads used for reading/writing cache files, adjust according to your CPU model
 "cache-process-thread-count": 8
 ```
 
-## 调试配置
+## Debug Configuration
 
 ```json
-//是否启用OptiX和图形API的调试模式
-//启用后会降低性能，仅在调试和开发中设置为true
+// Whether to enable debug mode for OptiX and graphics API
+// Enabling this reduces performance, only set to true during debugging and development
 "debug-mode": false
 ```
 
-## 材质配置
+## Material Configuration
 
-### 粒子材质颜色预设
+### Particle Material Color Presets
 
-**类型**：string  
-**说明**：用于生成粒子材质的色带  
-**值**：从以下值中任意选择一个，不区分大小写
+**Type**: string  
+**Description**: Used to generate color ramps for particle materials  
+**Values**: Choose any one from the following values, case-insensitive
 ```json
 "viridis" "plasma" "spectral"
 "terrain" "heatmap" "grayscale"
 ```
-若需要其他颜色映射，请参考`include/Util/ColorRamp.cuh`的实现，自行添加颜色映射枚举
+For other color mappings, refer to the implementation in `include/Util/ColorRamp.cuh` and add your own color mapping enumerations
 
 ### roughs
 
-**类型**：`array of objects`  
-**说明**：粗糙材质数组  
-**结构**：
+**Type**: `array of objects`  
+**Description**: Rough material array  
+**Structure**:
 
 ```json
 "roughs": [
@@ -77,25 +77,25 @@
 
 #### albedo
 
-**类型**：`array of float`（3 个元素）  
-**说明**：反照率颜色（RGB）  
-**范围**：`[0.0, 1.0]`  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Albedo color (RGB)  
+**Range**: `[0.0, 1.0]`  
+**Example**:
 
 ```json
 "roughs": [
-  {"albedo": [0.65, 0.05, 0.05]},  // 红色
-  {"albedo": [0.73, 0.73, 0.73]},  // 灰色
-  {"albedo": [0.12, 0.45, 0.15]},  // 绿色
-  {"albedo": [0.70, 0.60, 0.50]}   // 米色
+  {"albedo": [0.65, 0.05, 0.05]},  // Red
+  {"albedo": [0.73, 0.73, 0.73]},  // Gray
+  {"albedo": [0.12, 0.45, 0.15]},  // Green
+  {"albedo": [0.70, 0.60, 0.50]}   // Beige
 ]
 ```
 
 ### metals
 
-**类型**：`array of objects`  
-**说明**：金属材质数组  
-**结构**：
+**Type**: `array of objects`  
+**Description**: Metal material array  
+**Structure**:
 
 ```json
 "metals": [
@@ -108,10 +108,10 @@
 
 #### albedo
 
-**类型**：`array of float`（3 个元素）  
-**说明**：金属颜色（RGB）  
-**范围**：`[0.0, 1.0]`  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Metal color (RGB)  
+**Range**: `[0.0, 1.0]`  
+**Example**:
 
 ```json
 {"albedo": [0.8, 0.85, 0.88]}
@@ -119,28 +119,28 @@
 
 #### fuzz
 
-**类型**：`float`  
-**说明**：表面粗糙度  
-**范围**：`[0.0, 1.0]`  
-**说明**：
+**Type**: `float`  
+**Description**: Surface roughness  
+**Range**: `[0.0, 1.0]`  
+**Description**:
 
-- `0.0`：完全镜面反射
-- 值越大，表面越粗糙
+- `0.0`: Perfect specular reflection
+- Higher values mean rougher surface
 
-**示例**：
+**Example**:
 
 ```json
-{"albedo": [0.8, 0.85, 0.88], "fuzz": 0.0}  // 镜面
-{"albedo": [0.7, 0.6, 0.5], "fuzz": 0.3}    // 粗糙金属
+{"albedo": [0.8, 0.85, 0.88], "fuzz": 0.0}  // Specular
+{"albedo": [0.7, 0.6, 0.5], "fuzz": 0.3}    // Rough metal
 ```
 
-## 几何体配置
+## Geometry Configuration
 
 ### spheres
 
-**类型**：`array of objects`  
-**说明**：球体数组  
-**结构**：
+**Type**: `array of objects`  
+**Description**: Sphere array  
+**Structure**:
 
 ```json
 "spheres": [
@@ -158,9 +158,9 @@
 
 #### center
 
-**类型**：`array of float`（3 个元素）  
-**说明**：球心位置  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Sphere center position  
+**Example**:
 
 ```json
 "center": [0.0, 0.0, 0.0]
@@ -168,9 +168,9 @@
 
 #### radius
 
-**类型**：`float`  
-**说明**：球体半径  
-**示例**：
+**Type**: `float`  
+**Description**: Sphere radius  
+**Example**:
 
 ```json
 "radius": 1000.0
@@ -178,10 +178,10 @@
 
 #### mat-type
 
-**类型**：`string`  
-**说明**：材质类型  
-**可选值**：`"ROUGH"` 或 `"METAL"`  
-**示例**：
+**Type**: `string`  
+**Description**: Material type  
+**Values**: `"ROUGH"` or `"METAL"`  
+**Example**:
 
 ```json
 "mat-type": "ROUGH"
@@ -189,10 +189,10 @@
 
 #### mat-index
 
-**类型**：`integer`  
-**说明**：材质索引（对应 `roughs` 或 `metals` 数组索引）  
-**注意**：索引从 0 开始  
-**示例**：
+**Type**: `integer`  
+**Description**: Material index (corresponding to index in `roughs` or `metals` array)  
+**Note**: Index starts from 0  
+**Example**:
 
 ```json
 "mat-index": 3
@@ -200,9 +200,9 @@
 
 #### shift
 
-**类型**：`array of float`（3 个元素）  
-**说明**：位移向量  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Translation vector  
+**Example**:
 
 ```json
 "shift": [0.0, 0.0, -1000.5]
@@ -210,10 +210,10 @@
 
 #### rotate
 
-**类型**：`array of float`（3 个元素）  
-**说明**：旋转角度（度）  
-**注意**：当前实现可能未完全支持，建议使用 `[0.0, 0.0, 0.0]`  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Rotation angles (degrees)  
+**Note**: Current implementation may not fully support this, recommend using `[0.0, 0.0, 0.0]`  
+**Example**:
 
 ```json
 "rotate": [0.0, 0.0, 0.0]
@@ -221,9 +221,9 @@
 
 #### scale
 
-**类型**：`array of float`（3 个元素）  
-**说明**：缩放因子  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Scale factors  
+**Example**:
 
 ```json
 "scale": [1.0, 1.0, 1.0]
@@ -231,9 +231,9 @@
 
 ### triangles
 
-**类型**：`array of objects`  
-**说明**：三角形数组（当前可能未完全实现）  
-**结构**：
+**Type**: `array of objects`  
+**Description**: Triangle array (currently may not be fully implemented)  
+**Structure**:
 
 ```json
 "triangles": [
@@ -246,20 +246,20 @@
 ]
 ```
 
-## 渲染循环配置 (loop-data)
+## Render Loop Configuration (loop-data)
 
 ### api
 
-**类型**：`string`  
-**说明**：图形 API 类型  
-**可选值**：
+**Type**: `string`  
+**Description**: Graphics API type  
+**Values**:
 
-- `"OGL"`：OpenGL
-- `"VK"`：Vulkan
-- `"D3D11"`：Direct3D 11（仅 Windows）
-- `"D3D12"`：Direct3D 12（仅 Windows）
+- `"OGL"`: OpenGL
+- `"VK"`: Vulkan
+- `"D3D11"`: Direct3D 11 (Windows only)
+- `"D3D12"`: Direct3D 12 (Windows only)
 
-**示例**：
+**Example**:
 
 ```json
 "api": "VK"
@@ -267,9 +267,9 @@
 
 ### window-width
 
-**类型**：`integer`  
-**说明**：窗口宽度（像素）  
-**示例**：
+**Type**: `integer`  
+**Description**: Window width (pixels)  
+**Example**:
 
 ```json
 "window-width": 1200
@@ -277,9 +277,9 @@
 
 ### window-height
 
-**类型**：`integer`  
-**说明**：窗口高度（像素）  
-**示例**：
+**Type**: `integer`  
+**Description**: Window height (pixels)  
+**Example**:
 
 ```json
 "window-height": 800
@@ -287,9 +287,9 @@
 
 ### fps
 
-**类型**：`integer`  
-**说明**：目标帧率  
-**示例**：
+**Type**: `integer`  
+**Description**: Target frame rate  
+**Example**:
 
 ```json
 "fps": 60
@@ -297,9 +297,9 @@
 
 ### camera-center
 
-**类型**：`array of float`（3 个元素）  
-**说明**：初始相机位置  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Initial camera position  
+**Example**:
 
 ```json
 "camera-center": [5.0, 0.0, 0.0]
@@ -307,9 +307,9 @@
 
 ### camera-target
 
-**类型**：`array of float`（3 个元素）  
-**说明**：初始相机目标点（看向的位置）  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Initial camera target point (look-at position)  
+**Example**:
 
 ```json
 "camera-target": [0.0, 0.0, 0.0]
@@ -317,9 +317,9 @@
 
 ### up-direction
 
-**类型**：`array of float`（3 个元素）  
-**说明**：相机上方向量（无需单位化）  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Camera up vector (no need to normalize)  
+**Example**:
 
 ```json
 "up-direction": [0.0, 0.0, 1.0]
@@ -327,11 +327,11 @@
 
 ### camera-pitch-limit-degree
 
-**类型**：`float`  
-**说明**：相机俯仰角限制（度）  
-**范围**：应小于 90.0  
-**默认值**：`85.0`  
-**示例**：
+**Type**: `float`  
+**Description**: Camera pitch angle limit (degrees)  
+**Range**: Should be less than 90.0  
+**Default**: `85.0`  
+**Example**:
 
 ```json
 "camera-pitch-limit-degree": 85.0
@@ -339,10 +339,10 @@
 
 ### camera-speed-stride
 
-**类型**：`float`  
-**说明**：滚轮调节相机速度的变化量  
-**默认值**：`0.002`  
-**示例**：
+**Type**: `float`  
+**Description**: Camera speed change amount adjusted by mouse wheel  
+**Default**: `0.002`  
+**Example**:
 
 ```json
 "camera-speed-stride": 0.002
@@ -350,10 +350,10 @@
 
 ### camera-initial-speed-ratio
 
-**类型**：`integer`  
-**说明**：相机初始速度相对于 `camera-speed-stride` 的倍数  
-**默认值**：`10`  
-**示例**：
+**Type**: `integer`  
+**Description**: Multiplier for initial camera speed relative to `camera-speed-stride`  
+**Default**: `10`  
+**Example**:
 
 ```json
 "camera-initial-speed-ratio": 10
@@ -361,10 +361,10 @@
 
 ### mouse-sensitivity
 
-**类型**：`float`  
-**说明**：鼠标灵敏度  
-**默认值**：`0.002`  
-**示例**：
+**Type**: `float`  
+**Description**: Mouse sensitivity  
+**Default**: `0.002`  
+**Example**:
 
 ```json
 "mouse-sensitivity": 0.002
@@ -372,15 +372,15 @@
 
 ### render-speed-ratio
 
-**类型**：`integer`  
-**说明**：粒子运动速度倍率  
-**说明**：
+**Type**: `integer`  
+**Description**: Particle motion speed multiplier  
+**Description**:
 
-- 值越大，粒子运动越慢
-- `1` 表示原速
-- 用于控制动画播放速度
+- Higher values mean slower particle motion
+- `1` means original speed
+- Used to control animation playback speed
 
-**示例**：
+**Example**:
 
 ```json
 "render-speed-ratio": 4
@@ -388,9 +388,9 @@
 
 ### particle-shift
 
-**类型**：`array of float`（3 个元素）  
-**说明**：所有粒子的整体位移  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Global translation for all particles  
+**Example**:
 
 ```json
 "particle-shift": [0.0, 0.0, 0.0]
@@ -398,15 +398,15 @@
 
 ### particle-scale
 
-**类型**：`array of float`（3 个元素）  
-**说明**：所有粒子的整体缩放  
-**示例**：
+**Type**: `array of float` (3 elements)  
+**Description**: Global scale for all particles  
+**Example**:
 
 ```json
 "particle-scale": [1.0, 1.0, 1.0]
 ```
 
-## 完整配置示例
+## Complete Configuration Example
 
 ```json
 {
@@ -456,19 +456,19 @@
 }
 ```
 
-## 配置验证
+## Configuration Validation
 
-程序启动时会验证配置文件：
+The program validates the configuration file on startup:
 
-- JSON 格式检查
-- 字段检查
-- 类型检查
-- 平台兼容性检查（如 D3D11/D3D12 仅在 Windows下可用）
-- 由于项目包含CUDA调用，无法通过Proton等转译工具在Linux下使用D3D渲染
+- JSON format check
+- Field check
+- Type check
+- Platform compatibility check (e.g., D3D11/D3D12 only available on Windows)
+- Due to CUDA calls in the project, D3D rendering cannot be used on Linux through translation tools like Proton
 
-如果配置有误，程序会输出错误信息并退出，查看控制台以获取日志和错误信息。
+If there are configuration errors, the program will output error messages and exit. Check the console for logs and error information.
 
-## 下一步
+## Next Steps
 
-- [使用指南](usage.md) - 使用示例
-- [技术细节](technical-details.md) - 实现原理
+- [Usage Guide](usage.md) - Usage examples
+- [Technical Details](technical-details.md) - Implementation principles

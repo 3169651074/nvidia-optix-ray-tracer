@@ -1,15 +1,15 @@
-# VTK库编译指南
+# VTK Library Compilation Guide
 
-本文档指导编译最小化的VTK库，包含核心数据结构和基础IO模块，满足读取VTK文件的需要。
+This document guides you through compiling a minimal VTK library, including core data structures and basic IO modules, to meet the needs of reading VTK files.
 
-## 下载并解压源代码
+## Download and Extract Source Code
 
-前往[VTK官网](https://vtk.org/download)下载最新版本的源代码（.tar.gz）并解压。
+Visit the [VTK official website](https://vtk.org/download) to download the latest version of the source code (.tar.gz) and extract it.
 
-- Windows系统自带的解压缩速度较慢，对于VTK源代码，建议安装专门的解压缩软件，如[BandiZip](https://en.bandisoft.com/bandizip/)。tar.gz在Windows下通常需要解压两次。
-- Linux直接使用系统自带的tar解压即可。
+- The built-in decompression tool in Windows is relatively slow. For VTK source code, it is recommended to install dedicated decompression software such as [BandiZip](https://en.bandisoft.com/bandizip/). tar.gz files on Windows usually need to be extracted twice.
+- On Linux, use the system's built-in tar command for extraction.
 
-可参考SDL库的方式创建目录结构：
+You can create a directory structure similar to the SDL library:
 
 ```text
 VTK/
@@ -20,64 +20,64 @@ VTK/
         ...
 ```
 
-## 安装构建工具和CMake
+## Install Build Tools and CMake
 
-可参考[构建指南](build-guide.md)的前半部分，根据操作系统安装最新版本的编译器和CMake。
+Refer to the first half of the [Build Guide](build-guide.md) to install the latest version of the compiler and CMake according to your operating system.
 
-## 配置CMake项目
+## Configure CMake Project
 
-1. 打开CMake GUI，设置源代码目录和构建目录
-2. 点击Configure，选择系统对应的生成器（Windows为`Visual Studio 17 2022`，Linux为`Unix Makefiles`），其他设置保持默认
-3. 等待配置完成，出现红色选项
+1. Open CMake GUI, set the source code directory and build directory
+2. Click Configure, select the generator corresponding to your system (for Windows: `Visual Studio 17 2022`, for Linux: `Unix Makefiles`), keep other settings at default
+3. Wait for configuration to complete, red options will appear
 
-- Linux下，Configure时可能会报错：找不到.clang-tidy文件，导致配置失败。此时可以根据报错的位置，删除CMakeLists.txt的对应命令（通常为倒数第二条命令），或在源代码根目录创建一个空的.clang-tidy文件，这不会影响编译。
+- On Linux, Configure may report an error: .clang-tidy file not found, causing configuration to fail. In this case, you can delete the corresponding command in CMakeLists.txt based on the error location (usually the second to last command), or create an empty .clang-tidy file in the source code root directory. This will not affect compilation.
 
-4. 取消勾选所有复选框，将所有下拉列表项设置为“DONT_WANT”，编译类型选择或仅保留Release，设置安装路径为以上目录配置过程中的install文件夹
-5. 勾选“BUILD_SHARED_LIBS”选项，将“StandAlone”一项设置为“WANT”
-6. 其他设置保持第4步不变。若需要同时编译其他VTK功能模块，可以选择性开启。
+4. Uncheck all checkboxes, set all dropdown items to "DONT_WANT", select or keep only Release for build type, set the installation path to the install folder configured in the above directory structure
+5. Check the "BUILD_SHARED_LIBS" option, set the "StandAlone" item to "WANT"
+6. Keep other settings unchanged from step 4. If you need to compile other VTK functional modules simultaneously, you can selectively enable them.
 
-- 编译部分模块需要系统中已经安装有对应库，如QT模块，没有安装则会导致配置无效。对于RendererOptiX渲染器，仅需要编译“StandAlone”模块，其中包含VTK核心数据结构和基础IO函数
+- Compiling some modules requires corresponding libraries already installed on the system, such as the QT module. If not installed, configuration will be invalid. For the RendererOptiX renderer, only the "StandAlone" module needs to be compiled, which includes VTK core data structures and basic IO functions
 
-- 若配置无效或出现其他错误，需要删除build目录下所有文件并点击GUI左上角的Files -> Delete Cache清空所有缓存，并重新执行配置步骤
+- If configuration is invalid or other errors occur, you need to delete all files in the build directory and click Files -> Delete Cache in the upper left corner of the GUI to clear all caches, then re-execute the configuration steps
 
-7. 点击Generate生成项目。若无报错，建议备份此时的build文件夹，这样在编译过程中出错，需要重新编译时，无需重新执行配置步骤
+7. Click Generate to generate the project. If there are no errors, it is recommended to backup the build folder at this point, so that if an error occurs during compilation and you need to recompile, you don't need to re-execute the configuration steps
 
-## 编译
+## Compilation
 
 ### Windows
 
-直接点击Open Project，在Visual Studio中打开项目，在“解决方案资源管理器”中找到“ALL_BUILD”项目，右键点击“生成”，等待编译完成。
+Click Open Project directly to open the project in Visual Studio. In the "Solution Explorer", find the "ALL_BUILD" project, right-click and select "Build", then wait for compilation to complete.
 
-- 编译时间取决于CPU核心数和性能，在主流消费级CPU上需要约20分钟，慢于在Linux上的编译速度。
+- Compilation time depends on the number of CPU cores and performance. On mainstream consumer-grade CPUs, it takes about 20 minutes, which is slower than compilation on Linux.
 
 ### Linux
 
-关闭CMake GUI，在build目录下打开控制台，使用命令进行编译：
+Close CMake GUI, open a console in the build directory, and use the following command to compile:
 
 ```bash
-cmake --build . -j CPU线程数
+cmake --build . -j CPU_thread_count
 ```
 
-- Linux下，若CPU占用率过高，系统可能会Kill掉一些编译进程导致部分目标编译失败，因此强烈建议不要使用所有CPU线程进行编译，可以设置为CPU线程数的80%。
+- On Linux, if CPU usage is too high, the system may kill some compilation processes, causing some targets to fail compilation. Therefore, it is strongly recommended not to use all CPU threads for compilation. You can set it to 80% of the CPU thread count.
 
-## 安装
+## Installation
 
 ### Windows
-在“解决方案资源管理器”中找到“INSTALL”项目，右键生成即可。
+In the "Solution Explorer", find the "INSTALL" project and right-click to build.
 
-- 若编译无报错且生成报错，可以检查设置的CMAKE_INSTALL_PREFIX，若使用了反斜杠路径，则会导致安装失败。此时无需重新编译，找到INSTALL项目的CMakeLists.txt，修改安装路径为正斜杠分割即可。
+- If compilation has no errors but installation reports an error, check the set CMAKE_INSTALL_PREFIX. If a backslash path is used, it will cause installation to fail. In this case, there is no need to recompile. Find the CMakeLists.txt of the INSTALL project and modify the installation path to use forward slashes.
 
 ### Linux
 
-在build目录下执行安装命令：
+Execute the installation command in the build directory:
 
 ```bash
 cmake --install .
 ```
 
-## 集成到项目
+## Integration into Project
 
-同SDL库，设置lib路径即可。
+Same as the SDL library, set the lib path.
 
-- 在Windows下，需要拷贝bin目录下的所有动态库文件到可执行文件目录
-- Linux下通过CMake自动设置环境变量，可以不拷贝。
+- On Windows, you need to copy all dynamic library files from the bin directory to the executable file directory
+- On Linux, environment variables are automatically set through CMake, so copying is not necessary.
